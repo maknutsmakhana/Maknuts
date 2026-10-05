@@ -107,73 +107,57 @@ function StoreFront() {
         </section>
 
         {/* Verified Customer Reviews / Social Proof */}
-        <section className="bg-white rounded-3xl border border-[#E9DFD1] p-6 sm:p-8 shadow-xs">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#E9DFD1]">
-            <div>
-              <div className="flex items-center gap-1.5 text-amber-500 mb-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-amber-400 stroke-amber-400" />
-                ))}
-                <span className="text-xs font-bold text-stone-800 ml-1">4.9 / 5.0</span>
+        {storeSettings.reviewsSection && (
+          <section className="bg-white rounded-3xl border border-[#E9DFD1] p-6 sm:p-8 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#E9DFD1]">
+              <div>
+                <div className="flex items-center gap-1.5 text-amber-500 mb-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-amber-400 stroke-amber-400" />
+                  ))}
+                  <span className="text-xs font-bold text-stone-800 ml-1">
+                    {storeSettings.reviewsSection.ratingText || '4.9 / 5.0'}
+                  </span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-bold text-emerald-950 font-serif">
+                  {storeSettings.reviewsSection.title || 'Loved by Customers Across India'}
+                </h3>
+                {storeSettings.reviewsSection.subtitle && (
+                  <p className="text-xs text-stone-500">
+                    {storeSettings.reviewsSection.subtitle}
+                  </p>
+                )}
               </div>
-              <h3 className="text-lg sm:text-xl font-bold text-emerald-950 font-serif">
-                Loved for Authentic Bihar Crunch
-              </h3>
-              <p className="text-xs text-stone-500">
-                Real feedback from customers across India who switched to Maknuts.
-              </p>
+
+              {storeSettings.reviewsSection.guaranteeBadge && (
+                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shrink-0">
+                  <Award className="w-4 h-4 text-emerald-600" />
+                  <span>{storeSettings.reviewsSection.guaranteeBadge}</span>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shrink-0">
-              <Award className="w-4 h-4 text-emerald-600" />
-              <span>100% Satisfaction or Easy Replacement</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              {(storeSettings.reviewsSection.reviews || []).map((review, idx) => (
+                <div key={review.id || idx} className="bg-[#FAF8F5] p-4 rounded-2xl border border-stone-200/80 space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="flex text-amber-500 gap-0.5 mb-2">
+                      {[...Array(review.rating || 5)].map((_, i) => (
+                        <Star key={i} className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
+                      ))}
+                    </div>
+                    <p className="text-stone-700 italic leading-relaxed">
+                      "{review.comment}"
+                    </p>
+                  </div>
+                  <div className="font-bold text-stone-900 pt-2 border-t border-stone-200/60">
+                    — {review.name}{review.location ? `, ${review.location}` : ''}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-stone-200/80 space-y-2">
-              <div className="flex text-amber-500 gap-0.5">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                ))}
-              </div>
-              <p className="text-stone-700 italic leading-relaxed">
-                "The size of the makhanas is truly jumbo! No burnt pieces, super crunchy, and lightly salted taste is pure perfection for my daily evening snack."
-              </p>
-              <div className="font-bold text-stone-900 pt-1">
-                — Priya Verma, Bangalore
-              </div>
-            </div>
-
-            <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-stone-200/80 space-y-2">
-              <div className="flex text-amber-500 gap-0.5">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                ))}
-              </div>
-              <p className="text-stone-700 italic leading-relaxed">
-                "Ordering on WhatsApp was surprisingly fast and effortless. Sent the message, paid via UPI, and got courier tracking the next day. Top quality."
-              </p>
-              <div className="font-bold text-stone-900 pt-1">
-                — Amit K., New Delhi
-              </div>
-            </div>
-
-            <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-stone-200/80 space-y-2">
-              <div className="flex text-amber-500 gap-0.5">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                ))}
-              </div>
-              <p className="text-stone-700 italic leading-relaxed">
-                "Best makhana I've tasted in months. You can feel the freshness right after opening the zipper seal. My parents love having it with their morning tea."
-              </p>
-              <div className="font-bold text-stone-900 pt-1">
-                — Sunita Mishra, Patna
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
 
       {/* Store Footer */}

@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   shopName: 'Maknuts',
   tagline: 'Pure & Crisp Healthy Makhana',
   logoText: 'MAKNUTS',
+  brandBadge: 'Pure',
   bannerText: '🌱 100% Pure Makhana Direct from Bihar Farms · Flat ₹40 Delivery All India (Free on ₹600+)',
   bannerVisible: true,
   deliveryCharge: 40,
@@ -40,11 +41,85 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   supportEmail: 'maknutsmakhana@gmail.com',
   address: 'Maknuts Agri Foods, Darbhanga, Bihar, India - 846004',
   adminPassword: 'maknuts123',
+  trustBadges: ['Jumbo Grade', 'Sun-Dried & Roasted', 'Zero Trans Fat'],
   buttons: {
     buyNow: 'Buy Now',
     whatsappOrder: 'PLACE ORDER ON WHATSAPP',
     copyUpi: 'Copy UPI ID',
     chatWhatsApp: 'Chat on WhatsApp',
+    trackOrder: 'Track Order',
+    trackBanner: 'Track Order Live',
+  },
+  benefitsSection: {
+    title: 'Why Choose Maknuts Makhana?',
+    subtitle: 'The ancient superfood from Bihar, prepared with pure traditional care.',
+    items: [
+      {
+        id: 'b-1',
+        title: '100% Farm Fresh',
+        desc: 'Harvested directly from ponds in Mithila, Bihar without synthetic chemicals or bleaching.'
+      },
+      {
+        id: 'b-2',
+        title: 'Jumbo 6+ Sutta Grade',
+        desc: 'Only the largest, fluffiest lotus seeds are handpicked for superior crunch and puffiness.'
+      },
+      {
+        id: 'b-3',
+        title: 'Slow Hand-Roasted',
+        desc: 'Gently roasted in small batches to preserve natural crispiness and vital nutrients.'
+      },
+      {
+        id: 'b-4',
+        title: 'Heart & Diet Friendly',
+        desc: 'Packed with plant protein, rich in calcium, zero trans fat, low sodium and gluten-free.'
+      },
+      {
+        id: 'b-5',
+        title: 'Hygienic Packaging',
+        desc: 'Sealed in moisture-proof, food-grade zipper pouches to maintain peak crunchiness.'
+      },
+      {
+        id: 'b-6',
+        title: 'Prompt Delivery',
+        desc: 'Dispatched directly to your doorstep across India with careful packaging.'
+      }
+    ]
+  },
+  reviewsSection: {
+    title: 'Loved for Authentic Bihar Crunch',
+    subtitle: 'Real feedback from customers across India who switched to Maknuts.',
+    ratingText: '4.9 / 5.0',
+    guaranteeBadge: '100% Satisfaction or Easy Replacement',
+    reviews: [
+      {
+        id: 'r-1',
+        name: 'Priya Verma',
+        location: 'Bangalore',
+        rating: 5,
+        comment: 'The size of the makhanas is truly jumbo! No burnt pieces, super crunchy, and lightly salted taste is pure perfection for my daily evening snack.'
+      },
+      {
+        id: 'r-2',
+        name: 'Amit K.',
+        location: 'New Delhi',
+        rating: 5,
+        comment: 'Ordering on WhatsApp was surprisingly fast and effortless. Sent the message, paid via UPI, and got courier tracking the next day. Top quality.'
+      },
+      {
+        id: 'r-3',
+        name: 'Sunita Mishra',
+        location: 'Patna',
+        rating: 5,
+        comment: "Best makhana I've tasted in months. You can feel the freshness right after opening the zipper seal. My parents love having it with their morning tea."
+      }
+    ]
+  },
+  footerText: {
+    about: 'Bringing you 100% natural, farm-fresh jumbo Phool Makhana from the pristine wetlands of Bihar. Crispy, high-protein superfood snacks for your healthy daily life.',
+    qualityPromise: '100% Quality Guaranteed · Hygienic Sealed Packaging',
+    craftedBy: 'Crafted for pure health by Saroj 😊',
+    copyright: 'All rights reserved.'
   },
   policies: {
     terms: `TERMS & CONDITIONS - MAKNUTS MAKHANA

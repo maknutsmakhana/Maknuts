@@ -14,10 +14,46 @@ export interface Product {
   highlights?: string[];
 }
 
+export interface BenefitItem {
+  id: string;
+  title: string;
+  desc: string;
+}
+
+export interface ReviewItem {
+  id: string;
+  name: string;
+  location: string;
+  rating: number;
+  comment: string;
+}
+
+export interface BenefitsSectionSettings {
+  title: string;
+  subtitle: string;
+  items: BenefitItem[];
+}
+
+export interface ReviewsSectionSettings {
+  title: string;
+  subtitle: string;
+  ratingText: string;
+  guaranteeBadge: string;
+  reviews: ReviewItem[];
+}
+
+export interface FooterSettings {
+  about: string;
+  qualityPromise: string;
+  craftedBy: string;
+  copyright: string;
+}
+
 export interface StoreSettings {
   shopName: string;
   tagline: string;
   logoText: string;
+  brandBadge: string;
   bannerText: string;
   bannerVisible: boolean;
   deliveryCharge: number;
@@ -31,12 +67,18 @@ export interface StoreSettings {
   supportEmail: string;
   address: string;
   adminPassword: string;
+  trustBadges: string[];
   buttons: {
     buyNow: string;
     whatsappOrder: string;
     copyUpi: string;
     chatWhatsApp: string;
+    trackOrder: string;
+    trackBanner: string;
   };
+  benefitsSection: BenefitsSectionSettings;
+  reviewsSection: ReviewsSectionSettings;
+  footerText: FooterSettings;
   policies: {
     terms: string;
     privacy: string;

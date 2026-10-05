@@ -4,7 +4,8 @@ import { Product, StoreSettings, Order } from '../types';
 import { 
   X, Lock, Key, Plus, Trash2, Edit3, Save, Check, 
   RotateCcw, Package, Settings, ShoppingCart, FileText, 
-  Download, Upload, Eye, EyeOff, MessageCircle, AlertTriangle, ExternalLink, Image as ImageIcon, Truck
+  Download, Upload, Eye, EyeOff, MessageCircle, AlertTriangle, ExternalLink, Image as ImageIcon, Truck,
+  Star, Sparkles, Award, Leaf, Heart
 } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
 
@@ -38,9 +39,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showSettingsPassword, setShowSettingsPassword] = useState(false);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'products' | 'store' | 'homepage' | 'orders' | 'policies' | 'backup'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'store' | 'homepage' | 'benefits' | 'reviews' | 'orders' | 'policies' | 'backup'>('products');
 
   // Product Editing state
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -84,7 +86,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
       setIsAuthenticated(true);
       setAuthError('');
     } else {
-      setAuthError('Incorrect admin password. (Default is: maknuts123)');
+      setAuthError('Incorrect password. Please try again.');
     }
   };
 
@@ -248,7 +250,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter Password (default: maknuts123)"
+                  placeholder="Enter Admin Password"
                   value={passwordInput}
                   onChange={e => setPasswordInput(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/30"
@@ -276,9 +278,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 Login to Admin
               </button>
             </form>
-            <div className="text-[11px] text-stone-400 pt-2">
-              Default password: <code className="bg-stone-200 text-stone-700 px-1 py-0.5 rounded font-mono">maknuts123</code>
-            </div>
           </div>
         ) : (
           /* Authenticated Dashboard */
@@ -318,7 +317,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 }`}
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Banner & Buttons</span>
+                <span>Banner, Buttons & Footer</span>
+              </button>
+
+              <button
+                onClick={() => handleOpenStoreTab('benefits')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                  activeTab === 'benefits'
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                <Leaf className="w-3.5 h-3.5" />
+                <span>Why Choose Us ({settingsForm.benefitsSection?.items?.length || 0})</span>
+              </button>
+
+              <button
+                onClick={() => handleOpenStoreTab('reviews')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                  activeTab === 'reviews'
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                <Star className="w-3.5 h-3.5" />
+                <span>Reviews ({settingsForm.reviewsSection?.reviews?.length || 0})</span>
               </button>
 
               <button
@@ -820,28 +843,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                         Company & Admin Password
                       </h4>
 
-                      <div>
-                        <label className="block text-xs font-semibold text-stone-700 mb-1">
-                          Shop / Brand Name
-                        </label>
-                        <input
-                          type="text"
-                          value={settingsForm.shopName}
-                          onChange={e => setSettingsForm({ ...settingsForm, shopName: e.target.value })}
-                          className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
-                        />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Shop / Brand Name
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.shopName}
+                            onChange={e => setSettingsForm({ ...settingsForm, shopName: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Brand Badge (e.g. "Pure", "Organic")
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.brandBadge || ''}
+                            onChange={e => setSettingsForm({ ...settingsForm, brandBadge: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. Pure"
+                          />
+                        </div>
                       </div>
 
                       <div>
                         <label className="block text-xs font-semibold text-stone-700 mb-1">
-                          Admin Password
+                          Admin Password (Masked for Security)
                         </label>
-                        <input
-                          type="text"
-                          value={settingsForm.adminPassword}
-                          onChange={e => setSettingsForm({ ...settingsForm, adminPassword: e.target.value })}
-                          className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs font-mono"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showSettingsPassword ? 'text' : 'password'}
+                            value={settingsForm.adminPassword}
+                            onChange={e => setSettingsForm({ ...settingsForm, adminPassword: e.target.value })}
+                            className="w-full px-3 py-2 pr-10 rounded-xl border border-stone-300 text-xs font-mono"
+                            placeholder="Enter new password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSettingsPassword(!showSettingsPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 p-1"
+                            title={showSettingsPassword ? 'Hide password' : 'Show password'}
+                          >
+                            {showSettingsPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-stone-400 mt-1">
+                          Used to log in to this management dashboard.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -986,13 +1038,649 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                             className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
                           />
                         </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Track Order (Header) Button Label
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.buttons.trackOrder || 'Track Order'}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              buttons: { ...settingsForm.buttons, trackOrder: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Track Order (Banner) Button Label
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.buttons.trackBanner || 'Track Order Live'}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              buttons: { ...settingsForm.buttons, trackBanner: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trust Badges Under Product Image */}
+                    <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                            Trust Points Under Product Image
+                          </h4>
+                          <p className="text-[11px] text-stone-500">
+                            Checkmark pills shown directly under the main product picture.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = settingsForm.trustBadges || [];
+                            setSettingsForm({
+                              ...settingsForm,
+                              trustBadges: [...current, 'New Trust Badge']
+                            });
+                          }}
+                          className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add Badge</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {(settingsForm.trustBadges || []).map((badge, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 bg-stone-50 p-1.5 rounded-xl border border-stone-200">
+                            <input
+                              type="text"
+                              value={badge}
+                              onChange={e => {
+                                const updated = [...(settingsForm.trustBadges || [])];
+                                updated[idx] = e.target.value;
+                                setSettingsForm({ ...settingsForm, trustBadges: updated });
+                              }}
+                              className="flex-1 px-2 py-1 bg-white rounded-lg border border-stone-200 text-xs font-medium"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = (settingsForm.trustBadges || []).filter((_, i) => i !== idx);
+                                setSettingsForm({ ...settingsForm, trustBadges: updated });
+                              }}
+                              className="p-1 text-stone-400 hover:text-rose-600 cursor-pointer"
+                              title="Delete badge"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Footer Content & Credits */}
+                    <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                        Footer Texts & Credits
+                      </h4>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            About Brand / Store Description (Left Footer Column)
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={settingsForm.footerText?.about || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              footerText: {
+                                ...(settingsForm.footerText || { about: '', qualityPromise: '', craftedBy: '', copyright: '' }),
+                                about: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Quality Guarantee Note (with Shield Icon)
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.footerText?.qualityPromise || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              footerText: {
+                                ...(settingsForm.footerText || { about: '', qualityPromise: '', craftedBy: '', copyright: '' }),
+                                qualityPromise: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1">
+                              Crafted By Credit Note
+                            </label>
+                            <input
+                              type="text"
+                              value={settingsForm.footerText?.craftedBy || ''}
+                              onChange={e => setSettingsForm({
+                                ...settingsForm,
+                                footerText: {
+                                  ...(settingsForm.footerText || { about: '', qualityPromise: '', craftedBy: '', copyright: '' }),
+                                  craftedBy: e.target.value
+                                }
+                              })}
+                              className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                              placeholder="e.g. Crafted for pure health by Saroj 😊"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1">
+                              Copyright Note
+                            </label>
+                            <input
+                              type="text"
+                              value={settingsForm.footerText?.copyright || ''}
+                              onChange={e => setSettingsForm({
+                                ...settingsForm,
+                                footerText: {
+                                  ...(settingsForm.footerText || { about: '', qualityPromise: '', craftedBy: '', copyright: '' }),
+                                  copyright: e.target.value
+                                }
+                              })}
+                              className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                              placeholder="e.g. All rights reserved."
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* TAB 4: ORDERS RECEIVED */}
+              {/* TAB 4: WHY CHOOSE US / BENEFITS */}
+              {activeTab === 'benefits' && (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+                    <div>
+                      <h3 className="text-base font-bold text-stone-900 font-serif">
+                        Why Choose Us / Product Benefits Section
+                      </h3>
+                      <p className="text-xs text-stone-500">
+                        Customize the 6 benefits cards, headings, and descriptions shown on the home page.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveSettings}
+                      className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      {settingsSavedToast ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Saved!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Headings */}
+                    <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                        Section Titles
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Main Heading Title
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.benefitsSection?.title || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              benefitsSection: {
+                                ...(settingsForm.benefitsSection || { title: '', subtitle: '', items: [] }),
+                                title: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. Why Choose Maknuts Makhana?"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Subtitle Text
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.benefitsSection?.subtitle || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              benefitsSection: {
+                                ...(settingsForm.benefitsSection || { title: '', subtitle: '', items: [] }),
+                                subtitle: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. The ancient superfood from Bihar..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Benefit Cards List */}
+                    <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                          Benefit Cards ({settingsForm.benefitsSection?.items?.length || 0})
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = settingsForm.benefitsSection?.items || [];
+                            const newItem = {
+                              id: 'benefit-' + Date.now(),
+                              title: 'New Benefit',
+                              desc: 'Description of the benefit here.'
+                            };
+                            setSettingsForm({
+                              ...settingsForm,
+                              benefitsSection: {
+                                ...(settingsForm.benefitsSection || { title: '', subtitle: '', items: [] }),
+                                items: [...current, newItem]
+                              }
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add New Benefit Card</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        {(settingsForm.benefitsSection?.items || []).map((item, idx) => (
+                          <div key={item.id || idx} className="p-3 bg-stone-50 rounded-xl border border-stone-200 space-y-2 relative">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider">
+                                Card #{idx + 1}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (settingsForm.benefitsSection?.items || []).filter((_, i) => i !== idx);
+                                  setSettingsForm({
+                                    ...settingsForm,
+                                    benefitsSection: {
+                                      ...(settingsForm.benefitsSection || { title: '', subtitle: '', items: [] }),
+                                      items: updated
+                                    }
+                                  });
+                                }}
+                                className="text-stone-400 hover:text-rose-600 p-1 cursor-pointer"
+                                title="Delete card"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                Card Title
+                              </label>
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={e => {
+                                  const updated = [...(settingsForm.benefitsSection?.items || [])];
+                                  updated[idx] = { ...item, title: e.target.value };
+                                  setSettingsForm({
+                                    ...settingsForm,
+                                    benefitsSection: {
+                                      ...(settingsForm.benefitsSection || { title: '', subtitle: '', items: [] }),
+                                      items: updated
+                                    }
+                                  });
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                Card Description
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={item.desc}
+                                onChange={e => {
+                                  const updated = [...(settingsForm.benefitsSection?.items || [])];
+                                  updated[idx] = { ...item, desc: e.target.value };
+                                  setSettingsForm({
+                                    ...settingsForm,
+                                    benefitsSection: {
+                                      ...(settingsForm.benefitsSection || { title: '', subtitle: '', items: [] }),
+                                      items: updated
+                                    }
+                                  });
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 5: CUSTOMER REVIEWS & SOCIAL PROOF */}
+              {activeTab === 'reviews' && (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+                    <div>
+                      <h3 className="text-base font-bold text-stone-900 font-serif">
+                        Customer Reviews & Testimonials
+                      </h3>
+                      <p className="text-xs text-stone-500">
+                        Manage customer quotes, star ratings, overall scores, and guarantee badges.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveSettings}
+                      className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      {settingsSavedToast ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Saved!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Reviews Section Header Settings */}
+                    <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                        Section Header & Badges
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Main Heading Title
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.reviewsSection?.title || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              reviewsSection: {
+                                ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                title: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. Loved for Authentic Bihar Crunch"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Subtitle Text
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.reviewsSection?.subtitle || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              reviewsSection: {
+                                ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                subtitle: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. Real feedback from customers across India..."
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Average Star Rating Text
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.reviewsSection?.ratingText || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              reviewsSection: {
+                                ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                ratingText: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. 4.9 / 5.0"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Satisfaction Guarantee Badge Text
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.reviewsSection?.guaranteeBadge || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              reviewsSection: {
+                                ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                guaranteeBadge: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. 100% Satisfaction or Easy Replacement"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Reviews List */}
+                    <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                          Customer Reviews ({settingsForm.reviewsSection?.reviews?.length || 0})
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const current = settingsForm.reviewsSection?.reviews || [];
+                            const newReview = {
+                              id: 'rev-' + Date.now(),
+                              name: 'Customer Name',
+                              location: 'City',
+                              rating: 5,
+                              comment: 'Amazing fresh quality and great crunch!'
+                            };
+                            setSettingsForm({
+                              ...settingsForm,
+                              reviewsSection: {
+                                ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                reviews: [...current, newReview]
+                              }
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add New Review</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 pt-1">
+                        {(settingsForm.reviewsSection?.reviews || []).map((review, idx) => (
+                          <div key={review.id || idx} className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-emerald-950">
+                                Review #{idx + 1}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (settingsForm.reviewsSection?.reviews || []).filter((_, i) => i !== idx);
+                                  setSettingsForm({
+                                    ...settingsForm,
+                                    reviewsSection: {
+                                      ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                      reviews: updated
+                                    }
+                                  });
+                                }}
+                                className="text-stone-400 hover:text-rose-600 p-1 cursor-pointer"
+                                title="Delete review"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                  Customer Name
+                                </label>
+                                <input
+                                  type="text"
+                                  value={review.name}
+                                  onChange={e => {
+                                    const updated = [...(settingsForm.reviewsSection?.reviews || [])];
+                                    updated[idx] = { ...review, name: e.target.value };
+                                    setSettingsForm({
+                                      ...settingsForm,
+                                      reviewsSection: {
+                                        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                        reviews: updated
+                                      }
+                                    });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                  City / Location
+                                </label>
+                                <input
+                                  type="text"
+                                  value={review.location}
+                                  onChange={e => {
+                                    const updated = [...(settingsForm.reviewsSection?.reviews || [])];
+                                    updated[idx] = { ...review, location: e.target.value };
+                                    setSettingsForm({
+                                      ...settingsForm,
+                                      reviewsSection: {
+                                        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                        reviews: updated
+                                      }
+                                    });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                  Rating Stars (1 - 5)
+                                </label>
+                                <select
+                                  value={review.rating}
+                                  onChange={e => {
+                                    const updated = [...(settingsForm.reviewsSection?.reviews || [])];
+                                    updated[idx] = { ...review, rating: Number(e.target.value) };
+                                    setSettingsForm({
+                                      ...settingsForm,
+                                      reviewsSection: {
+                                        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                        reviews: updated
+                                      }
+                                    });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                                >
+                                  <option value={5}>⭐⭐⭐⭐⭐ (5 Stars)</option>
+                                  <option value={4}>⭐⭐⭐⭐ (4 Stars)</option>
+                                  <option value={3}>⭐⭐⭐ (3 Stars)</option>
+                                  <option value={2}>⭐⭐ (2 Stars)</option>
+                                  <option value={1}>⭐ (1 Star)</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                Review Feedback Comment
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={review.comment}
+                                onChange={e => {
+                                  const updated = [...(settingsForm.reviewsSection?.reviews || [])];
+                                  updated[idx] = { ...review, comment: e.target.value };
+                                  setSettingsForm({
+                                    ...settingsForm,
+                                    reviewsSection: {
+                                      ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                      reviews: updated
+                                    }
+                                  });
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 6: ORDERS RECEIVED */}
               {activeTab === 'orders' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between pb-2 border-b border-stone-200">

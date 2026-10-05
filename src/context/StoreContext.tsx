@@ -117,7 +117,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setStoreSettings({
             ...DEFAULT_SETTINGS,
             ...data,
+            trustBadges: data.trustBadges || DEFAULT_SETTINGS.trustBadges,
             buttons: { ...DEFAULT_SETTINGS.buttons, ...(data.buttons || {}) },
+            benefitsSection: {
+              ...DEFAULT_SETTINGS.benefitsSection,
+              ...(data.benefitsSection || {}),
+              items: data.benefitsSection?.items || DEFAULT_SETTINGS.benefitsSection.items
+            },
+            reviewsSection: {
+              ...DEFAULT_SETTINGS.reviewsSection,
+              ...(data.reviewsSection || {}),
+              reviews: data.reviewsSection?.reviews || DEFAULT_SETTINGS.reviewsSection.reviews
+            },
+            footerText: { ...DEFAULT_SETTINGS.footerText, ...(data.footerText || {}) },
             policies: { ...DEFAULT_SETTINGS.policies, ...(data.policies || {}) },
           });
         }
@@ -192,9 +204,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newSettings: StoreSettings = {
       ...storeSettings,
       ...updated,
+      trustBadges: updated.trustBadges || storeSettings.trustBadges,
       buttons: {
         ...storeSettings.buttons,
         ...(updated.buttons || {})
+      },
+      benefitsSection: {
+        ...storeSettings.benefitsSection,
+        ...(updated.benefitsSection || {}),
+        items: updated.benefitsSection?.items || storeSettings.benefitsSection?.items || []
+      },
+      reviewsSection: {
+        ...storeSettings.reviewsSection,
+        ...(updated.reviewsSection || {}),
+        reviews: updated.reviewsSection?.reviews || storeSettings.reviewsSection?.reviews || []
+      },
+      footerText: {
+        ...storeSettings.footerText,
+        ...(updated.footerText || {})
       },
       policies: {
         ...storeSettings.policies,

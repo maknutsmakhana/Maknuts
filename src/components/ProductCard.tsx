@@ -72,17 +72,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
           </div>
 
           {/* Trust points under photo */}
-          <div className="w-full pt-3 border-t border-[#DFD5C6] flex items-center justify-around text-[11px] font-semibold text-emerald-950/80">
-            <span className="flex items-center gap-1">
-              <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" /> Jumbo Grade
-            </span>
-            <span className="flex items-center gap-1">
-              <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" /> Sun-Dried & Roasted
-            </span>
-            <span className="flex items-center gap-1">
-              <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" /> Zero Trans Fat
-            </span>
-          </div>
+          {storeSettings.trustBadges && storeSettings.trustBadges.length > 0 && (
+            <div className="w-full pt-3 border-t border-[#DFD5C6] flex flex-wrap items-center justify-around gap-2 text-[11px] font-semibold text-emerald-950/80">
+              {storeSettings.trustBadges.map((badge, idx) => (
+                <span key={idx} className="flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" /> {badge}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right Side: Product Details & Purchase Actions */}

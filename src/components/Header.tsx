@@ -25,9 +25,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTracking }) => {
               <span className="font-extrabold tracking-tight text-xl sm:text-2xl text-emerald-950 font-serif">
                 {storeSettings.shopName}
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300/60">
-                Pure
-              </span>
+              {storeSettings.brandBadge && (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300/60">
+                  {storeSettings.brandBadge}
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-emerald-800/80 font-medium hidden sm:block">
               {storeSettings.tagline}
@@ -64,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTracking }) => {
             title="Track your order delivery status"
           >
             <Truck className="w-3.5 h-3.5 text-emerald-800" />
-            <span>Track Order</span>
+            <span>{storeSettings.buttons.trackOrder || 'Track Order'}</span>
           </button>
         </div>
       </div>

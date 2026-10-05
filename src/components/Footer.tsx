@@ -32,12 +32,11 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy }) => 
               </span>
             </div>
             <p className="text-stone-600 text-xs leading-relaxed max-w-sm">
-              Bringing you 100% natural, farm-fresh jumbo Phool Makhana from the pristine wetlands of Bihar.
-              Crispy, high-protein superfood snacks for your healthy daily life.
+              {storeSettings.footerText?.about || 'Bringing you 100% natural, farm-fresh jumbo Phool Makhana from the pristine wetlands of Bihar. Crispy, high-protein superfood snacks for your healthy daily life.'}
             </p>
             <div className="flex items-center gap-2 pt-1 text-emerald-900 font-semibold text-[11px]">
               <ShieldCheck className="w-4 h-4 text-emerald-700" />
-              <span>100% Quality Guaranteed · Hygienic Sealed Packaging</span>
+              <span>{storeSettings.footerText?.qualityPromise || '100% Quality Guaranteed · Hygienic Sealed Packaging'}</span>
             </div>
           </div>
 
@@ -117,12 +116,12 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy }) => 
         {/* Bottom bar */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-stone-500">
           <div>
-            © {new Date().getFullYear()} {storeSettings.shopName}. All rights reserved.
+            © {new Date().getFullYear()} {storeSettings.shopName}. {storeSettings.footerText?.copyright || 'All rights reserved.'}
           </div>
 
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5 text-stone-400">
-              Crafted for pure health by Saroj 😊 <Heart className="w-3 h-3 text-rose-500 fill-rose-500/50" />
+              {storeSettings.footerText?.craftedBy || 'Crafted for pure health by Saroj 😊'} <Heart className="w-3 h-3 text-rose-500 fill-rose-500/50" />
             </span>
 
             <button
