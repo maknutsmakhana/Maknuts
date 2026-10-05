@@ -1,14 +1,15 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { Sparkles, MessageCircle, Mail, MapPin, Lock, ShieldCheck, Heart } from 'lucide-react';
+import { Sparkles, MessageCircle, Mail, MapPin, Lock, ShieldCheck, Heart, MessageSquareHeart } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
 
 interface FooterProps {
   onOpenAdmin: () => void;
   onOpenPolicy: (type: 'terms' | 'privacy' | 'returns' | 'shipping') => void;
+  onOpenFeedback: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpenFeedback }) => {
   const { storeSettings } = useStore();
 
   const handleWhatsAppChat = () => {
@@ -107,6 +108,19 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy }) => 
                   className="hover:text-emerald-900 hover:underline cursor-pointer"
                 >
                   Privacy Policy
+                </button>
+              </li>
+              <li className="pt-2 border-t border-stone-300/60">
+                <button
+                  type="button"
+                  onClick={onOpenFeedback}
+                  className="flex items-center gap-1.5 font-bold text-emerald-900 hover:text-emerald-950 hover:underline cursor-pointer group"
+                >
+                  <MessageSquareHeart className="w-3.5 h-3.5 text-emerald-700 group-hover:scale-110 transition-transform" />
+                  <span>Customer Feedback</span>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 font-extrabold px-1.5 py-0.2 rounded-full ml-1">
+                    Form
+                  </span>
                 </button>
               </li>
             </ul>

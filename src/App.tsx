@@ -10,6 +10,8 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { TrackingModal } from './components/TrackingModal';
 import { PolicyModal } from './components/PolicyModal';
 import { Footer } from './components/Footer';
+import { FeedbackModal } from './components/FeedbackModal';
+import { PhotoGallery } from './components/PhotoGallery';
 import { Order } from './types';
 import { Star, ShieldCheck, Heart, Sparkles, Award } from 'lucide-react';
 
@@ -22,6 +24,7 @@ function StoreFront() {
   const [successOrder, setSuccessOrder] = useState<Order | null>(null);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [trackingQuery, setTrackingQuery] = useState('');
   const [activePolicy, setActivePolicy] = useState<'terms' | 'privacy' | 'returns' | 'shipping' | null>(null);
 
@@ -158,12 +161,22 @@ function StoreFront() {
             </div>
           </section>
         )}
+
+        {/* Real Farm & Product Photo Showcase */}
+        <PhotoGallery />
       </main>
 
       {/* Store Footer */}
       <Footer
         onOpenAdmin={() => setIsAdminOpen(true)}
         onOpenPolicy={policy => setActivePolicy(policy)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)}
+      />
+
+      {/* Customer Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
       />
 
       {/* Checkout Modal */}

@@ -34,5 +34,11 @@ service cloud.firestore {
       allow get, list: if true;
       allow create, update, delete: if isValidId(orderId);
     }
+
+    // Customer feedbacks: anyone can create/read feedbacks, write validated by id
+    match /feedbacks/{feedbackId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(feedbackId);
+    }
   }
 }

@@ -74,6 +74,23 @@
         "status": { "type": "string", "enum": ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"], "description": "Fulfillment status" }
       },
       "required": ["orderNumber", "customerName", "phone", "address", "pincode", "productName", "quantity", "totalAmount", "paymentMethod", "createdAt", "status"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "Customer feedback and reviews submitted via the feedback form",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique feedback ID" },
+        "customerName": { "type": "string", "description": "Customer name" },
+        "phone": { "type": "string", "description": "Customer phone or WhatsApp number" },
+        "email": { "type": "string", "description": "Customer email" },
+        "rating": { "type": "number", "description": "Rating out of 5 stars" },
+        "category": { "type": "string", "description": "Feedback category" },
+        "message": { "type": "string", "description": "Detailed feedback message or suggestion" },
+        "photo": { "type": "string", "description": "Optional customer image attachment" },
+        "createdAt": { "type": "string", "description": "Submission ISO timestamp" }
+      },
+      "required": ["id", "customerName", "rating", "category", "message", "createdAt"]
     }
   },
   "firestore": {
@@ -88,6 +105,10 @@
     "/orders/{orderId}": {
       "schema": { "$ref": "#/entities/Order" },
       "description": "Customer order records"
+    },
+    "/feedbacks/{feedbackId}": {
+      "schema": { "$ref": "#/entities/Feedback" },
+      "description": "Customer feedback submissions"
     }
   }
 }

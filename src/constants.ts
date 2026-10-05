@@ -87,8 +87,8 @@ export const DEFAULT_SETTINGS: StoreSettings = {
     ]
   },
   reviewsSection: {
-    title: 'Loved for Authentic Bihar Crunch',
-    subtitle: 'Real feedback from customers across India who switched to Maknuts.',
+    title: 'Customer Reviews & Feedback',
+    subtitle: 'Real reviews and feedback from happy customers across India who snack on Maknuts.',
     ratingText: '4.9 / 5.0',
     guaranteeBadge: '100% Satisfaction or Easy Replacement',
     reviews: [
@@ -97,6 +97,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
         name: 'Priya Verma',
         location: 'Bangalore',
         rating: 5,
+        category: 'Taste & Crunch Quality',
         comment: 'The size of the makhanas is truly jumbo! No burnt pieces, super crunchy, and lightly salted taste is pure perfection for my daily evening snack.'
       },
       {
@@ -104,6 +105,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
         name: 'Amit K.',
         location: 'New Delhi',
         rating: 5,
+        category: 'Delivery & Shipping Speed',
         comment: 'Ordering on WhatsApp was surprisingly fast and effortless. Sent the message, paid via UPI, and got courier tracking the next day. Top quality.'
       },
       {
@@ -111,7 +113,39 @@ export const DEFAULT_SETTINGS: StoreSettings = {
         name: 'Sunita Mishra',
         location: 'Patna',
         rating: 5,
+        category: 'Packaging & Seal',
         comment: "Best makhana I've tasted in months. You can feel the freshness right after opening the zipper seal. My parents love having it with their morning tea."
+      }
+    ]
+  },
+  gallerySection: {
+    title: 'Our Purity in Pictures',
+    subtitle: 'Direct from pristine wetlands of Mithila, Bihar to crispy, nutritious snack bowls.',
+    buttonLabel: '📸 View Farm & Product Photos',
+    photos: [
+      {
+        id: 'gp-1',
+        url: defaultProductImage,
+        caption: 'Maknuts Jumbo Grade Fox Nuts in sealed moisture-lock zipper pouch',
+        tag: 'Packaging & Purity'
+      },
+      {
+        id: 'gp-2',
+        url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80',
+        caption: 'Hand-roasted crispy lotus seeds prepared in small batches',
+        tag: 'Batch Roasting'
+      },
+      {
+        id: 'gp-3',
+        url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80',
+        caption: 'Ethically harvested from natural freshwater ponds in Darbhanga, Bihar',
+        tag: 'Farm Harvest'
+      },
+      {
+        id: 'gp-4',
+        url: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=800&q=80',
+        caption: 'Guilt-free high-protein crunchy superfood snack for daily health',
+        tag: 'Customer Moments'
       }
     ]
   },

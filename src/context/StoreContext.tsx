@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, StoreSettings, Order } from '../types';
+import { Product, StoreSettings, Order, Feedback, ReviewItem, GalleryPhoto } from '../types';
 import { DEFAULT_PRODUCT, DEFAULT_SETTINGS } from '../constants';
 import { 
   collection, 
@@ -40,6 +40,7 @@ interface StoreContextType {
   setActiveProductId: (id: string) => void;
   storeSettings: StoreSettings;
   orders: Order[];
+  feedbacks: Feedback[];
   isLoading: boolean;
   addProduct: (product: Omit<Product, 'id'>) => Promise<Product>;
   updateProduct: (product: Product) => Promise<void>;
@@ -50,6 +51,13 @@ interface StoreContextType {
   updateOrder: (orderId: string, updates: Partial<Order>) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   clearAllOrders: () => Promise<void>;
+  submitFeedback: (feedbackData: Omit<Feedback, 'id' | 'createdAt'>) => Promise<void>;
+  deleteFeedback: (id: string) => Promise<void>;
+  submitReviewAndFeedback: (reviewData: Omit<ReviewItem, 'id' | 'createdAt'>) => Promise<void>;
+  deleteReview: (reviewId: string, index?: number) => Promise<void>;
+  deleteReviewAndFeedback: (id: string, index?: number) => Promise<void>;
+  addGalleryPhoto: (photo: GalleryPhoto) => Promise<void>;
+  deleteGalleryPhoto: (photoId: string, index?: number) => Promise<void>;
   resetToDefaults: () => Promise<void>;
   exportData: () => string;
   importData: (jsonData: string) => Promise<boolean>;
@@ -62,6 +70,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [activeProductId, setActiveProductId] = useState<string>(DEFAULT_PRODUCT.id);
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 1. Realtime Firestore Sync for Products
@@ -127,7 +136,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             reviewsSection: {
               ...DEFAULT_SETTINGS.reviewsSection,
               ...(data.reviewsSection || {}),
-              reviews: data.reviewsSection?.reviews || DEFAULT_SETTINGS.reviewsSection.reviews
+              reviews: Array.isArray(data.reviewsSection?.reviews)
+                ? data.reviewsSection.reviews
+                : DEFAULT_SETTINGS.reviewsSection.reviews
+            },
+            gallerySection: {
+              ...DEFAULT_SETTINGS.gallerySection,
+              ...(data.gallerySection || {}),
+              photos: Array.isArray(data.gallerySection?.photos)
+                ? data.gallerySection.photos
+                : DEFAULT_SETTINGS.gallerySection.photos
             },
             footerText: { ...DEFAULT_SETTINGS.footerText, ...(data.footerText || {}) },
             policies: { ...DEFAULT_SETTINGS.policies, ...(data.policies || {}) },
@@ -158,6 +176,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, ordersPath);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // 4. Realtime Firestore Sync for Customer Feedbacks
+  useEffect(() => {
+    const feedbacksPath = 'feedbacks';
+    const unsubscribe = onSnapshot(
+      collection(db, feedbacksPath),
+      (snapshot) => {
+        const list: Feedback[] = [];
+        snapshot.forEach((d) => {
+          list.push(d.data() as Feedback);
+        });
+        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setFeedbacks(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, feedbacksPath);
       }
     );
 
@@ -217,7 +256,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       reviewsSection: {
         ...storeSettings.reviewsSection,
         ...(updated.reviewsSection || {}),
-        reviews: updated.reviewsSection?.reviews || storeSettings.reviewsSection?.reviews || []
+        reviews: updated.reviewsSection?.reviews !== undefined
+          ? updated.reviewsSection.reviews
+          : (storeSettings.reviewsSection?.reviews || [])
+      },
+      gallerySection: {
+        ...storeSettings.gallerySection,
+        ...(updated.gallerySection || {}),
+        photos: updated.gallerySection?.photos !== undefined
+          ? updated.gallerySection.photos
+          : (storeSettings.gallerySection?.photos || [])
       },
       footerText: {
         ...storeSettings.footerText,
@@ -308,6 +356,133 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Firebase Submit Customer Feedback
+  const submitFeedback = async (feedbackData: Omit<Feedback, 'id' | 'createdAt'>): Promise<void> => {
+    const feedbackId = 'fb-' + Date.now();
+    const newFeedback: Feedback = {
+      ...feedbackData,
+      id: feedbackId,
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      await setDoc(doc(db, 'feedbacks', feedbackId), sanitizeForFirestore(newFeedback));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.CREATE, `feedbacks/${feedbackId}`);
+    }
+  };
+
+  // Firebase Delete Customer Feedback
+  const deleteFeedback = async (id: string): Promise<void> => {
+    try {
+      await deleteDoc(doc(db, 'feedbacks', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `feedbacks/${id}`);
+    }
+  };
+
+  // Unified Submit Review & Feedback
+  const submitReviewAndFeedback = async (reviewData: Omit<ReviewItem, 'id' | 'createdAt'>): Promise<void> => {
+    const newId = 'rev-' + Date.now();
+    const newReview: ReviewItem = {
+      ...reviewData,
+      id: newId,
+      createdAt: new Date().toISOString()
+    };
+    const currentReviews = storeSettings.reviewsSection?.reviews || [];
+    const updatedReviews = [newReview, ...currentReviews];
+    await updateSettings({
+      reviewsSection: {
+        ...(storeSettings.reviewsSection || DEFAULT_SETTINGS.reviewsSection),
+        reviews: updatedReviews
+      }
+    });
+
+    try {
+      await setDoc(doc(db, 'feedbacks', newId), sanitizeForFirestore({
+        ...newReview,
+        customerName: newReview.name,
+        message: newReview.comment,
+        createdAt: newReview.createdAt
+      }));
+    } catch {
+      // Non-fatal
+    }
+  };
+
+  // Unified Delete Review / Feedback
+  const deleteReviewAndFeedback = async (id: string, index?: number): Promise<void> => {
+    const currentReviews = storeSettings.reviewsSection?.reviews || [];
+    const updatedReviews = currentReviews.filter((r, idx) => {
+      if (id && r.id) return r.id !== id;
+      return idx !== index;
+    });
+    const newSettings: StoreSettings = {
+      ...storeSettings,
+      reviewsSection: {
+        ...(storeSettings.reviewsSection || DEFAULT_SETTINGS.reviewsSection),
+        reviews: updatedReviews
+      }
+    };
+    setStoreSettings(newSettings);
+    try {
+      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(newSettings));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'settings/store');
+    }
+
+    if (id) {
+      try {
+        await deleteDoc(doc(db, 'feedbacks', id));
+      } catch {
+        // Non-fatal
+      }
+    }
+  };
+
+  // Backwards compatibility alias
+  const deleteReview = deleteReviewAndFeedback;
+
+  // Add Photo to Gallery
+  const addGalleryPhoto = async (newPhoto: GalleryPhoto): Promise<void> => {
+    const currentPhotos = storeSettings.gallerySection?.photos || DEFAULT_SETTINGS.gallerySection.photos;
+    const updatedPhotos = [newPhoto, ...currentPhotos];
+    const newSettings: StoreSettings = {
+      ...storeSettings,
+      gallerySection: {
+        ...(storeSettings.gallerySection || DEFAULT_SETTINGS.gallerySection),
+        photos: updatedPhotos
+      }
+    };
+    setStoreSettings(newSettings);
+    try {
+      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(newSettings));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'settings/store');
+    }
+  };
+
+  // Delete Photo from Gallery (reliable direct deletion)
+  const deleteGalleryPhoto = async (photoId: string, index?: number): Promise<void> => {
+    const currentPhotos = storeSettings.gallerySection?.photos || DEFAULT_SETTINGS.gallerySection.photos;
+    const filtered = currentPhotos.filter((p, i) => {
+      if (photoId && p.id) return p.id !== photoId;
+      return i !== index;
+    });
+    const newSettings: StoreSettings = {
+      ...storeSettings,
+      gallerySection: {
+        ...(storeSettings.gallerySection || DEFAULT_SETTINGS.gallerySection),
+        photos: filtered
+      }
+    };
+    setStoreSettings(newSettings);
+    try {
+      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(newSettings));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'settings/store');
+    }
+  };
+
   // Firebase Reset to Defaults
   const resetToDefaults = async (): Promise<void> => {
     try {
@@ -368,6 +543,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveProductId,
         storeSettings,
         orders,
+        feedbacks,
         isLoading,
         addProduct,
         updateProduct,
@@ -378,6 +554,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateOrder,
         deleteOrder,
         clearAllOrders,
+        submitFeedback,
+        deleteFeedback,
+        submitReviewAndFeedback,
+        deleteReview,
+        deleteReviewAndFeedback,
+        addGalleryPhoto,
+        deleteGalleryPhoto,
         resetToDefaults,
         exportData,
         importData,

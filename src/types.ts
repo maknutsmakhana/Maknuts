@@ -26,6 +26,12 @@ export interface ReviewItem {
   location: string;
   rating: number;
   comment: string;
+  phone?: string;
+  email?: string;
+  photo?: string;
+  category?: string;
+  createdAt?: string;
+  featured?: boolean;
 }
 
 export interface BenefitsSectionSettings {
@@ -47,6 +53,21 @@ export interface FooterSettings {
   qualityPromise: string;
   craftedBy: string;
   copyright: string;
+}
+
+export interface GalleryPhoto {
+  id: string;
+  url: string;
+  caption: string;
+  tag: string; // e.g. "Farm Harvest", "Customer Snap", "Batch Roasting", "Packaging"
+  createdAt?: string;
+}
+
+export interface GallerySectionSettings {
+  title: string;
+  subtitle: string;
+  buttonLabel: string;
+  photos: GalleryPhoto[];
 }
 
 export interface StoreSettings {
@@ -78,6 +99,7 @@ export interface StoreSettings {
   };
   benefitsSection: BenefitsSectionSettings;
   reviewsSection: ReviewsSectionSettings;
+  gallerySection: GallerySectionSettings;
   footerText: FooterSettings;
   policies: {
     terms: string;
@@ -113,4 +135,16 @@ export interface Order {
   trackingUrl?: string;
   estimatedDelivery?: string;
   statusNotes?: string;
+}
+
+export interface Feedback {
+  id: string;
+  customerName: string;
+  phone?: string;
+  email?: string;
+  rating: number; // 1 to 5
+  category: string;
+  message: string;
+  photo?: string;
+  createdAt: string;
 }

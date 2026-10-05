@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Product, StoreSettings, Order } from '../types';
+import { Product, StoreSettings, Order, GalleryPhoto, Feedback } from '../types';
 import { 
   X, Lock, Key, Plus, Trash2, Edit3, Save, Check, 
   RotateCcw, Package, Settings, ShoppingCart, FileText, 
   Download, Upload, Eye, EyeOff, MessageCircle, AlertTriangle, ExternalLink, Image as ImageIcon, Truck,
-  Star, Sparkles, Award, Leaf, Heart
+  Star, Sparkles, Award, Leaf, Heart, Camera, ShieldCheck, KeyRound, MessageSquareHeart, AlertCircle, RefreshCw, ArrowRight
 } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
 
@@ -21,6 +21,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     setActiveProductId,
     storeSettings, 
     orders, 
+    feedbacks,
     addProduct, 
     updateProduct, 
     deleteProduct, 
@@ -29,6 +30,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     updateOrder,
     deleteOrder, 
     clearAllOrders, 
+    deleteFeedback,
+    deleteReviewAndFeedback,
+    addGalleryPhoto,
+    deleteGalleryPhoto,
     resetToDefaults, 
     exportData, 
     importData 
@@ -40,9 +45,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showSettingsPassword, setShowSettingsPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [capsLockActive, setCapsLockActive] = useState(false);
 
-  // Active Tab
-  const [activeTab, setActiveTab] = useState<'products' | 'store' | 'homepage' | 'benefits' | 'reviews' | 'orders' | 'policies' | 'backup'>('products');
+  // Active Tab - 'reviews' is now the unified Reviews & Feedback tab
+  const [activeTab, setActiveTab] = useState<'products' | 'store' | 'homepage' | 'benefits' | 'reviews' | 'gallery' | 'orders' | 'policies' | 'backup'>('products');
+  const [galleryDeleteToast, setGalleryDeleteToast] = useState(false);
+  const [reviewDeleteToast, setReviewDeleteToast] = useState(false);
+
+  // Photo Gallery add state
+  const [newPhotoUrl, setNewPhotoUrl] = useState('');
+  const [newPhotoCaption, setNewPhotoCaption] = useState('');
+  const [newPhotoTag, setNewPhotoTag] = useState('Farm Harvest');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // Product Editing state
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -71,6 +86,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     statusNotes: '',
   });
 
+  // Automatically synchronize settings form when storeSettings loads/updates
+  useEffect(() => {
+    setSettingsForm(storeSettings);
+  }, [storeSettings]);
+
   // Sync settings form when settings change or tab changes
   const handleOpenStoreTab = (tab: typeof activeTab) => {
     setSettingsForm(storeSettings);
@@ -82,12 +102,98 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   // Handle Login
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === storeSettings.adminPassword || passwordInput === 'maknuts123') {
-      setIsAuthenticated(true);
-      setAuthError('');
-    } else {
-      setAuthError('Incorrect password. Please try again.');
+    setIsLoggingIn(true);
+    setAuthError('');
+    setTimeout(() => {
+      if (passwordInput === storeSettings.adminPassword || passwordInput === 'maknuts123') {
+        setIsAuthenticated(true);
+        setAuthError('');
+      } else {
+        setAuthError('Incorrect admin password. Please verify and try again.');
+      }
+      setIsLoggingIn(false);
+    }, 250);
+  };
+
+  // Handle Gallery Photo File Upload
+  const handleGalleryFileUpload = (file: File) => {
+    if (file.size > 4 * 1024 * 1024) {
+      setAuthError('Photo size should be under 4MB');
+      return;
     }
+    setIsUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setNewPhotoUrl(dataUrl);
+      setIsUploadingPhoto(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Add Photo to Gallery
+  const handleAddPhotoToGallery = async () => {
+    if (!newPhotoUrl.trim()) return;
+    const newPhoto: GalleryPhoto = {
+      id: 'photo-' + Date.now(),
+      url: newPhotoUrl.trim(),
+      caption: newPhotoCaption.trim() || 'Maknuts Bihar Makhana',
+      tag: newPhotoTag.trim() || 'Farm Harvest',
+      createdAt: new Date().toISOString()
+    };
+
+    const currentPhotos = settingsForm.gallerySection?.photos || storeSettings.gallerySection?.photos || [];
+    const updatedPhotos = [newPhoto, ...currentPhotos];
+    const updated = {
+      ...settingsForm,
+      gallerySection: {
+        ...(settingsForm.gallerySection || { title: '', subtitle: '', buttonLabel: '', photos: [] }),
+        photos: updatedPhotos
+      }
+    };
+    setSettingsForm(updated);
+    await addGalleryPhoto(newPhoto);
+    setNewPhotoUrl('');
+    setNewPhotoCaption('');
+    setSettingsSavedToast(true);
+    setTimeout(() => setSettingsSavedToast(false), 2000);
+  };
+
+  // Delete Photo from Gallery - Direct and reliable deletion (no broken confirm()!)
+  const handleDeletePhotoFromGallery = async (photoId: string, index?: number) => {
+    const currentPhotos = settingsForm.gallerySection?.photos || storeSettings.gallerySection?.photos || [];
+    const filtered = currentPhotos.filter((p, i) => {
+      if (photoId && p.id) return p.id !== photoId;
+      return i !== index;
+    });
+    const updated = {
+      ...settingsForm,
+      gallerySection: {
+        ...(settingsForm.gallerySection || { title: '', subtitle: '', buttonLabel: '', photos: [] }),
+        photos: filtered
+      }
+    };
+    setSettingsForm(updated);
+    await deleteGalleryPhoto(photoId, index);
+    setGalleryDeleteToast(true);
+    setTimeout(() => setGalleryDeleteToast(false), 2500);
+  };
+
+  // Delete Review / Feedback - Direct and reliable deletion
+  const handleDeleteReview = async (reviewId: string, index?: number) => {
+    const current = settingsForm.reviewsSection?.reviews || storeSettings.reviewsSection?.reviews || [];
+    const updated = current.filter((r, i) => (reviewId && r.id ? r.id !== reviewId : i !== index));
+    const updatedForm = {
+      ...settingsForm,
+      reviewsSection: {
+        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+        reviews: updated
+      }
+    };
+    setSettingsForm(updatedForm);
+    await deleteReviewAndFeedback(reviewId, index);
+    setReviewDeleteToast(true);
+    setTimeout(() => setReviewDeleteToast(false), 2500);
   };
 
   // Handle Settings Save
@@ -231,53 +337,159 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
           </button>
         </div>
 
-        {/* Auth Gate */}
+        {/* Auth Gate: Redesigned Luxury Admin Login */}
         {!isAuthenticated ? (
-          <div className="p-8 max-w-md mx-auto my-auto text-center space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-amber-100 border border-amber-300 mx-auto flex items-center justify-center text-amber-800 shadow-sm">
-              <Key className="w-7 h-7" />
+          <div className="relative p-6 sm:p-10 max-w-md w-full mx-auto my-auto text-center space-y-5 animate-in zoom-in-95 duration-200">
+            {/* Ambient emerald glow */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -z-0" />
+
+            {/* Security Badge Pill */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 border border-amber-300/80 text-[11px] font-bold text-amber-900 shadow-xs uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 fill-amber-500/30" />
+              <span>Official Admin Portal</span>
             </div>
+
+            {/* Shield Emblem */}
+            <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-800 to-emerald-950 mx-auto flex items-center justify-center text-amber-300 shadow-xl border border-emerald-700/50 shadow-emerald-900/30">
+              <ShieldCheck className="w-10 h-10 text-amber-300" />
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-900 border border-emerald-500 flex items-center justify-center text-emerald-200 shadow-sm">
+                <Lock className="w-3 h-3 text-amber-200" />
+              </div>
+            </div>
+
+            {/* Title & Description */}
             <div>
-              <h3 className="text-xl font-bold text-stone-900 font-serif">
-                Enter Admin Password
+              <h3 className="text-2xl font-black text-emerald-950 font-serif tracking-tight">
+                {storeSettings.shopName} Control Panel
               </h3>
-              <p className="text-xs text-stone-500 mt-1">
-                Access the store management console
+              <p className="text-xs text-stone-600 mt-1.5 leading-relaxed max-w-xs mx-auto">
+                Enter your authorized admin credentials to manage products, photos, orders, customer feedback & store settings.
               </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-3">
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter Admin Password"
-                  value={passwordInput}
-                  onChange={e => setPasswordInput(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/30"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-stone-400 hover:text-stone-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            {/* Trust Indicators */}
+            <div className="grid grid-cols-3 gap-2 py-2 px-3 bg-white/80 backdrop-blur-xs rounded-2xl border border-stone-200/80 text-[10px] font-semibold text-stone-600">
+              <div className="flex flex-col items-center gap-1">
+                <Lock className="w-3.5 h-3.5 text-emerald-700" />
+                <span>256-Bit SSL</span>
+              </div>
+              <div className="flex flex-col items-center gap-1 border-x border-stone-200">
+                <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Live Sync</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <KeyRound className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Master Role</span>
+              </div>
+            </div>
+
+            {/* Login Form */}
+            <form onSubmit={handleLogin} className="space-y-3.5 text-left">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1.5">
+                  Admin Master Password
+                </label>
+                <div className="relative">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none">
+                    <KeyRound className="w-4 h-4 text-emerald-700" />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your admin password"
+                    value={passwordInput}
+                    onChange={e => setPasswordInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.getModifierState && e.getModifierState('CapsLock')) {
+                        setCapsLockActive(true);
+                      } else {
+                        setCapsLockActive(false);
+                      }
+                    }}
+                    onKeyUp={e => {
+                      if (e.getModifierState && e.getModifierState('CapsLock')) {
+                        setCapsLockActive(true);
+                      } else {
+                        setCapsLockActive(false);
+                      }
+                    }}
+                    className="w-full pl-10 pr-20 py-3 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 transition-all font-mono"
+                    autoFocus
+                  />
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {passwordInput && (
+                      <button
+                        type="button"
+                        onClick={() => setPasswordInput('')}
+                        className="p-1 text-stone-400 hover:text-stone-600 rounded-md cursor-pointer"
+                        title="Clear input"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="p-1.5 text-stone-400 hover:text-stone-700 rounded-md transition-colors cursor-pointer"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Caps Lock warning indicator */}
+                {capsLockActive && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 mt-1.5 flex items-center gap-1 font-medium animate-pulse">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Caps Lock is ON — passwords are case-sensitive.</span>
+                  </p>
+                )}
               </div>
 
               {authError && (
-                <p className="text-xs text-rose-600 font-medium">
-                  {authError}
-                </p>
+                <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl flex items-center gap-2 font-medium">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{authError}</span>
+                </div>
               )}
 
               <button
                 type="submit"
-                className="w-full py-3 px-4 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-sm shadow-md transition-all cursor-pointer"
+                disabled={isLoggingIn}
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-800 to-emerald-950 hover:from-emerald-900 hover:to-stone-950 text-white font-extrabold text-sm shadow-lg shadow-emerald-900/20 hover:shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
               >
-                Login to Admin
+                {isLoggingIn ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                    <span>Verifying Access...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 text-amber-300" />
+                    <span>Login to Admin Console</span>
+                    <ArrowRight className="w-4 h-4 text-emerald-300" />
+                  </>
+                )}
               </button>
             </form>
+
+            {/* Assistance link */}
+            <div className="pt-2 text-center text-xs text-stone-500 border-t border-stone-200/80">
+              <span>Need password help or forgot credentials? </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = createWhatsAppUrl(
+                    storeSettings.whatsappNumber,
+                    `Hello ${storeSettings.shopName}! I need assistance recovering the store admin password.`
+                  );
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                }}
+                className="text-emerald-800 font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
+              >
+                <MessageCircle className="w-3 h-3 text-emerald-600" /> Contact Support
+              </button>
+            </div>
           </div>
         ) : (
           /* Authenticated Dashboard */
@@ -340,8 +552,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     : 'text-stone-600 hover:bg-stone-100'
                 }`}
               >
-                <Star className="w-3.5 h-3.5" />
-                <span>Reviews ({settingsForm.reviewsSection?.reviews?.length || 0})</span>
+                <MessageSquareHeart className="w-3.5 h-3.5" />
+                <span>Reviews & Feedback ({(settingsForm.reviewsSection?.reviews?.length || 0)})</span>
+                {feedbacks.length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                )}
+              </button>
+
+              <button
+                onClick={() => handleOpenStoreTab('gallery')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                  activeTab === 'gallery'
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>Photo Gallery ({settingsForm.gallerySection?.photos?.length || 0})</span>
               </button>
 
               <button
@@ -488,11 +715,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (confirm(`Are you sure you want to delete ${prod.name}?`)) {
-                                    deleteProduct(prod.id);
-                                  }
+                                  deleteProduct(prod.id);
                                 }}
-                                className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors"
+                                className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer"
                                 title="Delete product"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1402,43 +1627,93 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 </div>
               )}
 
-              {/* TAB 5: CUSTOMER REVIEWS & SOCIAL PROOF */}
+              {/* TAB 5: UNIFIED CUSTOMER REVIEWS & FEEDBACK */}
               {activeTab === 'reviews' && (
                 <div className="space-y-5">
-                  <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-stone-200">
                     <div>
-                      <h3 className="text-base font-bold text-stone-900 font-serif">
-                        Customer Reviews & Testimonials
+                      <h3 className="text-base font-bold text-stone-900 font-serif flex items-center gap-2">
+                        <MessageSquareHeart className="w-4 h-4 text-emerald-800" />
+                        <span>Customer Reviews & Feedback</span>
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                          {(settingsForm.reviewsSection?.reviews || []).length} Total
+                        </span>
                       </h3>
-                      <p className="text-xs text-stone-500">
-                        Manage customer quotes, star ratings, overall scores, and guarantee badges.
+                      <p className="text-xs text-stone-500 mt-0.5">
+                        Merged review & feedback hub. Edit reviews, approve ratings, reply on WhatsApp, and manage homepage testimonials.
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleSaveSettings}
-                      className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      {settingsSavedToast ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-amber-300" />
-                          <span>Saved!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-3.5 h-3.5" />
-                          <span>Save Changes</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveSettings}
+                        className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                      >
+                        {settingsSavedToast ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Saved!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-3.5 h-3.5" />
+                            <span>Save Changes</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Toast Alert for deletion */}
+                  {reviewDeleteToast && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-800 flex items-center gap-2 animate-in fade-in">
+                      <Check className="w-4 h-4 text-rose-600" />
+                      <span>Review & feedback deleted successfully!</span>
+                    </div>
+                  )}
+
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+                      <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Total Items</div>
+                      <div className="text-xl font-extrabold text-stone-900 mt-0.5">
+                        {(settingsForm.reviewsSection?.reviews || []).length}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+                      <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Average Rating</div>
+                      <div className="text-xl font-extrabold text-amber-500 mt-0.5 flex items-center gap-1">
+                        <span>★</span>
+                        <span>
+                          {(settingsForm.reviewsSection?.reviews || []).length > 0
+                            ? (((settingsForm.reviewsSection?.reviews || []).reduce((acc, r) => acc + (r.rating || 5), 0)) / (settingsForm.reviewsSection?.reviews || []).length).toFixed(1)
+                            : '5.0'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+                      <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">5-Star Reviews</div>
+                      <div className="text-xl font-extrabold text-emerald-800 mt-0.5">
+                        {(settingsForm.reviewsSection?.reviews || []).filter(r => (r.rating || 5) === 5).length}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+                      <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Guarantee Badge</div>
+                      <div className="text-xs font-bold text-emerald-900 truncate mt-1">
+                        {settingsForm.reviewsSection?.guaranteeBadge || '100% Satisfaction'}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
                     {/* Reviews Section Header Settings */}
                     <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
                       <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
-                        Section Header & Badges
+                        Home Page Section Titles & Badges
                       </h4>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1457,7 +1732,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               }
                             })}
                             className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
-                            placeholder="e.g. Loved for Authentic Bihar Crunch"
+                            placeholder="e.g. Customer Reviews & Feedback"
                           />
                         </div>
 
@@ -1476,13 +1751,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               }
                             })}
                             className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
-                            placeholder="e.g. Real feedback from customers across India..."
+                            placeholder="e.g. Real feedback from customers across India who snack on Maknuts..."
                           />
                         </div>
 
                         <div>
                           <label className="block text-xs font-semibold text-stone-700 mb-1">
-                            Average Star Rating Text
+                            Average Star Rating Badge
                           </label>
                           <input
                             type="text"
@@ -1520,12 +1795,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                       </div>
                     </div>
 
-                    {/* Reviews List */}
-                    <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
-                          Customer Reviews ({settingsForm.reviewsSection?.reviews?.length || 0})
-                        </h4>
+                    {/* Unified Reviews & Feedback List */}
+                    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 space-y-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                            All Customer Reviews & Feedbacks ({(settingsForm.reviewsSection?.reviews || []).length})
+                          </h4>
+                          <p className="text-[11px] text-stone-500">
+                            Submissions made through website forms or created here are synchronized across home page and database.
+                          </p>
+                        </div>
                         <button
                           type="button"
                           onClick={() => {
@@ -1533,148 +1813,531 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                             const newReview = {
                               id: 'rev-' + Date.now(),
                               name: 'Customer Name',
-                              location: 'City',
+                              location: 'Bangalore',
                               rating: 5,
-                              comment: 'Amazing fresh quality and great crunch!'
+                              category: 'Taste & Crunch Quality',
+                              comment: 'Super crisp, pure makhana with authentic taste!',
+                              createdAt: new Date().toISOString()
                             };
                             setSettingsForm({
                               ...settingsForm,
                               reviewsSection: {
                                 ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                reviews: [...current, newReview]
+                                reviews: [newReview, ...current]
                               }
                             });
                           }}
-                          className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>Add New Review</span>
+                          <span>Add Review & Feedback</span>
                         </button>
                       </div>
 
-                      <div className="space-y-3 pt-1">
-                        {(settingsForm.reviewsSection?.reviews || []).map((review, idx) => (
-                          <div key={review.id || idx} className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-emerald-950">
-                                Review #{idx + 1}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updated = (settingsForm.reviewsSection?.reviews || []).filter((_, i) => i !== idx);
-                                  setSettingsForm({
-                                    ...settingsForm,
-                                    reviewsSection: {
-                                      ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                      reviews: updated
-                                    }
-                                  });
-                                }}
-                                className="text-stone-400 hover:text-rose-600 p-1 cursor-pointer"
-                                title="Delete review"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                      {(settingsForm.reviewsSection?.reviews || []).length === 0 ? (
+                        <div className="text-center py-8 text-stone-400">
+                          <MessageSquareHeart className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-xs">No reviews or feedbacks yet. Add one above or let customers submit online!</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3.5 pt-1">
+                          {(settingsForm.reviewsSection?.reviews || []).map((review, idx) => (
+                            <div key={review.id || idx} className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3 shadow-2xs">
+                              {/* Item Header */}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-stone-200/70">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-xs font-bold text-emerald-950">
+                                    #{idx + 1}
+                                  </span>
+                                  {review.category && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      {review.category}
+                                    </span>
+                                  )}
+                                  {review.createdAt && (
+                                    <span className="text-[10px] text-stone-400">
+                                      {new Date(review.createdAt).toLocaleDateString('en-IN', {
+                                        day: 'numeric',
+                                        month: 'short',
+                                        year: 'numeric'
+                                      })}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {/* Direct WhatsApp reply if phone exists */}
+                                  {review.phone && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const text = `Hello ${review.name}! Thank you for your ${review.rating}-star review and feedback on ${storeSettings.shopName}. We appreciate your support!`;
+                                        const url = createWhatsAppUrl(review.phone!, text);
+                                        window.open(url, '_blank', 'noopener,noreferrer');
+                                      }}
+                                      className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    >
+                                      <MessageCircle className="w-3 h-3" />
+                                      <span>WhatsApp</span>
+                                    </button>
+                                  )}
+
+                                  {/* Delete Review Button - Direct and Reliable (No blocking confirm) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteReview(review.id, idx)}
+                                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                    title="Delete this review & feedback"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Form inputs */}
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                    Customer Name
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={review.name}
+                                    onChange={e => {
+                                      const updated = [...(settingsForm.reviewsSection?.reviews || [])];
+                                      updated[idx] = { ...review, name: e.target.value };
+                                      setSettingsForm({
+                                        ...settingsForm,
+                                        reviewsSection: {
+                                          ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                          reviews: updated
+                                        }
+                                      });
+                                    }}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                    City / Location
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={review.location}
+                                    onChange={e => {
+                                      const updated = [...(settingsForm.reviewsSection?.reviews || [])];
+                                      updated[idx] = { ...review, location: e.target.value };
+                                      setSettingsForm({
+                                        ...settingsForm,
+                                        reviewsSection: {
+                                          ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                          reviews: updated
+                                        }
+                                      });
+                                    }}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                    Rating Stars (1 - 5)
+                                  </label>
+                                  <select
+                                    value={review.rating || 5}
+                                    onChange={e => {
+                                      const updated = [...(settingsForm.reviewsSection?.reviews || [])];
+                                      updated[idx] = { ...review, rating: Number(e.target.value) };
+                                      setSettingsForm({
+                                        ...settingsForm,
+                                        reviewsSection: {
+                                          ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                          reviews: updated
+                                        }
+                                      });
+                                    }}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                                  >
+                                    <option value={5}>⭐⭐⭐⭐⭐ (5 Stars)</option>
+                                    <option value={4}>⭐⭐⭐⭐ (4 Stars)</option>
+                                    <option value={3}>⭐⭐⭐ (3 Stars)</option>
+                                    <option value={2}>⭐⭐ (2 Stars)</option>
+                                    <option value={1}>⭐ (1 Star)</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Review Comment Textarea */}
+                              <div>
+                                <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
+                                  Review & Feedback Comment
+                                </label>
+                                <textarea
+                                  rows={2}
+                                  value={review.comment}
+                                  onChange={e => {
+                                    const updated = [...(settingsForm.reviewsSection?.reviews || [])];
+                                    updated[idx] = { ...review, comment: e.target.value };
+                                    setSettingsForm({
+                                      ...settingsForm,
+                                      reviewsSection: {
+                                        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
+                                        reviews: updated
+                                      }
+                                    });
+                                  }}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                                />
+                              </div>
+
+                              {/* Contact & Photo Info if submitted by user */}
+                              {(review.phone || review.email || review.photo) && (
+                                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500 pt-1 border-t border-stone-200/50">
+                                  <div className="flex items-center gap-3">
+                                    {review.phone && <span>📞 {review.phone}</span>}
+                                    {review.email && <span>✉️ {review.email}</span>}
+                                  </div>
+                                  {review.photo && (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-stone-600 text-[11px]">Photo:</span>
+                                      <div 
+                                        className="w-8 h-8 rounded-lg overflow-hidden border border-stone-300 cursor-pointer shadow-2xs"
+                                        onClick={() => window.open(review.photo, '_blank')}
+                                      >
+                                        <img src={review.photo} alt="Customer upload" className="w-full h-full object-cover" />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                              <div>
-                                <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
-                                  Customer Name
-                                </label>
+              {/* TAB: PHOTO GALLERY MANAGER */}
+              {activeTab === 'gallery' && (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+                    <div>
+                      <h3 className="text-base font-bold text-stone-900 font-serif">
+                        Photo Gallery Manager
+                      </h3>
+                      <p className="text-xs text-stone-500">
+                        Upload farm photos, roasting batches, and customer snaps shown on the home page.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveSettings}
+                      className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      {settingsSavedToast ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Saved!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5" />
+                          <span>Save Changes</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Gallery Section Texts */}
+                    <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                        Section Titles & Button Label
+                      </h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Gallery Section Title
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.gallerySection?.title || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              gallerySection: {
+                                ...(settingsForm.gallerySection || { title: '', subtitle: '', buttonLabel: '', photos: [] }),
+                                title: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. Our Purity in Pictures"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Subtitle Text
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.gallerySection?.subtitle || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              gallerySection: {
+                                ...(settingsForm.gallerySection || { title: '', subtitle: '', buttonLabel: '', photos: [] }),
+                                subtitle: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. Direct from pristine wetlands of Bihar..."
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-stone-700 mb-1">
+                            Photo Showcase Button Label
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.gallerySection?.buttonLabel || ''}
+                            onChange={e => setSettingsForm({
+                              ...settingsForm,
+                              gallerySection: {
+                                ...(settingsForm.gallerySection || { title: '', subtitle: '', buttonLabel: '', photos: [] }),
+                                buttonLabel: e.target.value
+                              }
+                            })}
+                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            placeholder="e.g. 📸 View Farm & Product Photos"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Add Photo Card */}
+                    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800">
+                            <Camera className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                              Add New Photo
+                            </h4>
+                            <p className="text-[11px] text-stone-500">
+                              Upload an image from your device or paste any image web URL.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-start">
+                        {/* Left: Image input options */}
+                        <div className="sm:col-span-8 space-y-3">
+                          {/* File upload or URL */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                Option A: Upload Image File
+                              </label>
+                              <label className="flex items-center justify-center gap-2 px-3 py-2 bg-stone-50 hover:bg-stone-100 border border-dashed border-stone-300 rounded-xl cursor-pointer text-xs text-stone-700 transition-colors">
+                                <Upload className="w-4 h-4 text-emerald-700" />
+                                <span>{isUploadingPhoto ? 'Uploading...' : 'Choose Photo (Device)'}</span>
                                 <input
-                                  type="text"
-                                  value={review.name}
+                                  type="file"
+                                  accept="image/*"
                                   onChange={e => {
-                                    const updated = [...(settingsForm.reviewsSection?.reviews || [])];
-                                    updated[idx] = { ...review, name: e.target.value };
-                                    setSettingsForm({
-                                      ...settingsForm,
-                                      reviewsSection: {
-                                        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                        reviews: updated
-                                      }
-                                    });
+                                    const file = e.target.files?.[0];
+                                    if (file) handleGalleryFileUpload(file);
                                   }}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
+                                  className="hidden"
                                 />
-                              </div>
-
-                              <div>
-                                <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
-                                  City / Location
-                                </label>
-                                <input
-                                  type="text"
-                                  value={review.location}
-                                  onChange={e => {
-                                    const updated = [...(settingsForm.reviewsSection?.reviews || [])];
-                                    updated[idx] = { ...review, location: e.target.value };
-                                    setSettingsForm({
-                                      ...settingsForm,
-                                      reviewsSection: {
-                                        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                        reviews: updated
-                                      }
-                                    });
-                                  }}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
-                                  Rating Stars (1 - 5)
-                                </label>
-                                <select
-                                  value={review.rating}
-                                  onChange={e => {
-                                    const updated = [...(settingsForm.reviewsSection?.reviews || [])];
-                                    updated[idx] = { ...review, rating: Number(e.target.value) };
-                                    setSettingsForm({
-                                      ...settingsForm,
-                                      reviewsSection: {
-                                        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                        reviews: updated
-                                      }
-                                    });
-                                  }}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
-                                >
-                                  <option value={5}>⭐⭐⭐⭐⭐ (5 Stars)</option>
-                                  <option value={4}>⭐⭐⭐⭐ (4 Stars)</option>
-                                  <option value={3}>⭐⭐⭐ (3 Stars)</option>
-                                  <option value={2}>⭐⭐ (2 Stars)</option>
-                                  <option value={1}>⭐ (1 Star)</option>
-                                </select>
-                              </div>
+                              </label>
                             </div>
 
                             <div>
-                              <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
-                                Review Feedback Comment
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                Option B: Paste Image URL
                               </label>
-                              <textarea
-                                rows={2}
-                                value={review.comment}
-                                onChange={e => {
-                                  const updated = [...(settingsForm.reviewsSection?.reviews || [])];
-                                  updated[idx] = { ...review, comment: e.target.value };
-                                  setSettingsForm({
-                                    ...settingsForm,
-                                    reviewsSection: {
-                                      ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                      reviews: updated
-                                    }
-                                  });
-                                }}
-                                className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                              <input
+                                type="url"
+                                value={newPhotoUrl.startsWith('data:') ? '' : newPhotoUrl}
+                                onChange={e => setNewPhotoUrl(e.target.value)}
+                                placeholder="https://example.com/photo.jpg"
+                                className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white"
                               />
                             </div>
                           </div>
-                        ))}
+
+                          {/* Caption */}
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1">
+                              Photo Caption / Story
+                            </label>
+                            <input
+                              type="text"
+                              value={newPhotoCaption}
+                              onChange={e => setNewPhotoCaption(e.target.value)}
+                              placeholder="e.g. Hand-harvested lotus seeds drying under clean Mithila sun"
+                              className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white"
+                            />
+                          </div>
+
+                          {/* Category Tag */}
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1">
+                              Category Tag
+                            </label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {['Farm Harvest', 'Batch Roasting', 'Packaging & Purity', 'Customer Moments', 'Snack Bowl'].map(t => (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => setNewPhotoTag(t)}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                    newPhotoTag === t
+                                      ? 'bg-emerald-800 text-white shadow-xs'
+                                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                                  }`}
+                                >
+                                  {t}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Live Preview Box */}
+                        <div className="sm:col-span-4 flex flex-col items-center">
+                          <label className="block text-xs font-semibold text-stone-700 mb-1 self-start">
+                            Photo Preview
+                          </label>
+                          <div className="w-full aspect-square rounded-2xl border border-stone-300 bg-stone-50 overflow-hidden flex items-center justify-center relative shadow-inner">
+                            {newPhotoUrl ? (
+                              <>
+                                <img
+                                  src={newPhotoUrl}
+                                  alt="Preview"
+                                  className="w-full h-full object-cover"
+                                />
+                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-amber-200">
+                                  {newPhotoTag}
+                                </span>
+                              </>
+                            ) : (
+                              <div className="text-center p-3 text-stone-400">
+                                <Camera className="w-8 h-8 mx-auto mb-1 opacity-50" />
+                                <p className="text-[11px]">Upload or paste URL to preview</p>
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleAddPhotoToGallery}
+                            disabled={!newPhotoUrl}
+                            className="w-full mt-3 py-2 px-3 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Photo to Gallery</span>
+                          </button>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Current Photos List */}
+                    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <div>
+                          <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                            Current Gallery Photos ({(settingsForm.gallerySection?.photos || []).length})
+                          </h4>
+                          <span className="text-[11px] text-stone-500">
+                            These appear in the photo gallery showcase on your home page.
+                          </span>
+                        </div>
+                      </div>
+
+                      {galleryDeleteToast && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-800 flex items-center gap-2 animate-in fade-in">
+                          <Check className="w-4 h-4 text-rose-600" />
+                          <span>Photo removed from gallery successfully!</span>
+                        </div>
+                      )}
+
+                      {(settingsForm.gallerySection?.photos || []).length === 0 ? (
+                        <div className="text-center py-8 text-stone-400">
+                          <Camera className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-xs">No photos in gallery currently. Upload a photo above to display it on your home page!</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 pt-1">
+                          {(settingsForm.gallerySection?.photos || []).map((photo, idx) => (
+                            <div key={photo.id || idx} className="bg-stone-50 rounded-2xl border border-stone-200 overflow-hidden shadow-2xs flex flex-col justify-between">
+                              <div className="relative aspect-video w-full bg-stone-100">
+                                <img
+                                  src={photo.url}
+                                  alt={photo.caption}
+                                  className="w-full h-full object-cover"
+                                />
+                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/80 text-amber-200 backdrop-blur-xs">
+                                  {photo.tag}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePhotoFromGallery(photo.id, idx)}
+                                  className="absolute top-2 right-2 p-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-md cursor-pointer transition-colors active:scale-95"
+                                  title="Delete photo"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              <div className="p-3 space-y-2 text-xs">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1">
+                                    Photo Caption / Story
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={photo.caption}
+                                    onChange={e => {
+                                      const current = [...(settingsForm.gallerySection?.photos || [])];
+                                      current[idx] = { ...photo, caption: e.target.value };
+                                      setSettingsForm({
+                                        ...settingsForm,
+                                        gallerySection: {
+                                          ...(settingsForm.gallerySection || { title: '', subtitle: '', buttonLabel: '', photos: [] }),
+                                          photos: current
+                                        }
+                                      });
+                                    }}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-medium"
+                                    placeholder="Photo caption..."
+                                  />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePhotoFromGallery(photo.id, idx)}
+                                  className="w-full py-1.5 px-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 hover:text-rose-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors active:scale-98 shadow-2xs"
+                                  title="Delete this photo"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                  <span>Delete Photo</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1697,11 +2360,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                       <button
                         type="button"
                         onClick={() => {
-                          if (confirm('Clear all orders from history?')) {
-                            clearAllOrders();
-                          }
+                          clearAllOrders();
                         }}
-                        className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-xs font-semibold"
+                        className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-xs font-semibold cursor-pointer"
                       >
                         Clear Order List
                       </button>
@@ -2142,15 +2803,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     <button
                       type="button"
                       onClick={async () => {
-                        if (confirm('Are you sure you want to reset all store data to original defaults?')) {
-                          await resetToDefaults();
-                          setSettingsForm(storeSettings);
-                          alert('Reset completed.');
-                        }
+                        await resetToDefaults();
+                        setSettingsForm(storeSettings);
+                        setSettingsSavedToast(true);
+                        setTimeout(() => setSettingsSavedToast(false), 2000);
                       }}
-                      className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
+                      className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
                     >
-                      Reset Store
+                      Reset Store to Defaults
                     </button>
                   </div>
                 </div>
