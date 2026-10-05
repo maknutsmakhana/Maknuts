@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Product item available in the Maknuts store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique product ID" },
+        "name": { "type": "string", "description": "Product display name" },
+        "tagline": { "type": "string", "description": "Short marketing subtitle" },
+        "price": { "type": "number", "description": "Current selling price in INR" },
+        "originalPrice": { "type": "number", "description": "MRP strikethrough price in INR" },
+        "weight": { "type": "string", "description": "Package weight or size" },
+        "shortDescription": { "type": "string", "description": "Brief description of the product" },
+        "fullDescription": { "type": "string", "description": "Detailed description" },
+        "image": { "type": "string", "description": "Image URL or base64 data string" },
+        "inStock": { "type": "boolean", "description": "Stock availability flag" },
+        "stockStatusText": { "type": "string", "description": "Human-readable stock status" },
+        "badge": { "type": "string", "description": "Promotional badge text" },
+        "highlights": { "type": "array", "description": "List of key health benefits" }
+      },
+      "required": ["id", "name", "price", "weight", "image", "inStock"]
+    },
+    "StoreSettings": {
+      "title": "StoreSettings",
+      "description": "Global store settings, payment details and policies",
+      "type": "object",
+      "properties": {
+        "shopName": { "type": "string", "description": "Brand/shop name" },
+        "tagline": { "type": "string", "description": "Brand slogan" },
+        "logoText": { "type": "string", "description": "Short logo badge text" },
+        "bannerText": { "type": "string", "description": "Announcement banner text" },
+        "bannerVisible": { "type": "boolean", "description": "Whether announcement banner is visible" },
+        "deliveryCharge": { "type": "number", "description": "Standard delivery fee in INR" },
+        "freeDeliveryThreshold": { "type": "number", "description": "Order amount for free delivery" },
+        "upiId": { "type": "string", "description": "Manual UPI payment ID" },
+        "upiPayeeName": { "type": "string", "description": "Payee name for UPI QR" },
+        "enableUpi": { "type": "boolean", "description": "Whether UPI payment option is enabled" },
+        "enableCod": { "type": "boolean", "description": "Whether Cash on Delivery is enabled" },
+        "whatsappNumber": { "type": "string", "description": "WhatsApp number for orders" },
+        "supportPhone": { "type": "string", "description": "Support phone number" },
+        "supportEmail": { "type": "string", "description": "Support email address" },
+        "address": { "type": "string", "description": "Business physical address" },
+        "adminPassword": { "type": "string", "description": "Password for accessing admin dashboard" },
+        "buttons": { "type": "object", "description": "Customizable button labels" },
+        "policies": { "type": "object", "description": "Store terms, privacy, returns policies" }
+      },
+      "required": ["shopName", "upiId", "whatsappNumber"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order record placed through the store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Order internal document ID" },
+        "orderNumber": { "type": "string", "description": "Human-readable order sequence ID" },
+        "customerName": { "type": "string", "description": "Customer full name" },
+        "phone": { "type": "string", "description": "10-digit customer mobile number" },
+        "address": { "type": "string", "description": "Full delivery address" },
+        "pincode": { "type": "string", "description": "6-digit postal PIN code" },
+        "productId": { "type": "string", "description": "Purchased product ID" },
+        "productName": { "type": "string", "description": "Purchased product name" },
+        "productWeight": { "type": "string", "description": "Package weight of the item" },
+        "quantity": { "type": "number", "description": "Purchased quantity" },
+        "unitPrice": { "type": "number", "description": "Price per unit in INR" },
+        "subtotal": { "type": "number", "description": "Order subtotal in INR" },
+        "deliveryCharge": { "type": "number", "description": "Delivery charge in INR" },
+        "totalAmount": { "type": "number", "description": "Total payable amount in INR" },
+        "paymentMethod": { "type": "string", "enum": ["upi", "cod"], "description": "Selected payment method" },
+        "upiRefNumber": { "type": "string", "description": "Optional UPI UTR reference number" },
+        "paymentScreenshot": { "type": "string", "description": "Optional payment screenshot data" },
+        "note": { "type": "string", "description": "Optional delivery instructions" },
+        "createdAt": { "type": "string", "description": "Order ISO timestamp" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"], "description": "Fulfillment status" }
+      },
+      "required": ["orderNumber", "customerName", "phone", "address", "pincode", "productName", "quantity", "totalAmount", "paymentMethod", "createdAt", "status"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Products available in the store"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/StoreSettings" },
+      "description": "Store configuration and policies"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer order records"
+    }
+  }
+}

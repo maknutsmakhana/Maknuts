@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Test connection doc
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // Products catalog: anyone can read (get & list), write validated by id
+    match /products/{productId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(productId);
+    }
+
+    // Store settings (e.g. settings/store)
+    match /settings/{settingId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(settingId);
+    }
+
+    // Customer orders: allow reading and creating orders, write validated by id
+    match /orders/{orderId} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(orderId);
+    }
+  }
+}

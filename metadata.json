@@ -1,0 +1,6 @@
+{
+  "name": "Maknuts Makhana Store",
+  "description": "Clean, mobile-first shopping app for Maknuts Makhana with manual UPI, Cash on Delivery, instant WhatsApp ordering, and admin product management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
