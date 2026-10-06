@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { X, Sparkles, Truck } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 
 interface BannerProps {
   onOpenTracking?: () => void;
@@ -24,17 +24,6 @@ export const Banner: React.FC<BannerProps> = ({ onOpenTracking }) => {
               {storeSettings.bannerText}
             </span>
           </div>
-
-          {onOpenTracking && (
-            <button
-              type="button"
-              onClick={onOpenTracking}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 border border-amber-300/40 text-[11px] font-bold transition-all cursor-pointer"
-            >
-              <Truck className="w-3 h-3 text-amber-300" />
-              <span>{storeSettings.buttons.trackBanner || 'Track Order Live'}</span>
-            </button>
-          )}
         </div>
         <button
           onClick={() => setDismissed(true)}

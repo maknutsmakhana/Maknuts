@@ -5,9 +5,17 @@ import {
   X, Lock, Key, Plus, Trash2, Edit3, Save, Check, 
   RotateCcw, Package, Settings, ShoppingCart, FileText, 
   Download, Upload, Eye, EyeOff, MessageCircle, AlertTriangle, ExternalLink, Image as ImageIcon, Truck,
-  Star, Sparkles, Award, Leaf, Heart, Camera, ShieldCheck, KeyRound, MessageSquareHeart, AlertCircle, RefreshCw, ArrowRight
+  Star, Sparkles, Award, Leaf, Heart, Camera, ShieldCheck, KeyRound, MessageSquareHeart, AlertCircle, RefreshCw, ArrowRight,
+  Phone, Mail, MapPin, Clock, Headphones, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
+
+const SAMPLE_MAKHANA_PHOTOS = [
+  { label: 'Crispy Roasted Bowl', url: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?auto=format&fit=crop&q=80&w=800' },
+  { label: 'White Jumbo Seeds', url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=800' },
+  { label: 'Moisture Stand Pouch', url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=800' },
+  { label: 'Lotus Pond Harvest', url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=800' },
+];
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -48,20 +56,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [capsLockActive, setCapsLockActive] = useState(false);
 
-  // Active Tab - 'reviews' is now the unified Reviews & Feedback tab
-  const [activeTab, setActiveTab] = useState<'products' | 'store' | 'homepage' | 'benefits' | 'reviews' | 'gallery' | 'orders' | 'policies' | 'backup'>('products');
+  // Active Tab - with dedicated Customer Support tab
+  const [activeTab, setActiveTab] = useState<'products' | 'store' | 'support' | 'homepage' | 'benefits' | 'reviews' | 'gallery' | 'orders' | 'policies' | 'backup'>('products');
   const [galleryDeleteToast, setGalleryDeleteToast] = useState(false);
   const [reviewDeleteToast, setReviewDeleteToast] = useState(false);
 
   // Photo Gallery add state
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [newPhotoCaption, setNewPhotoCaption] = useState('');
-  const [newPhotoTag, setNewPhotoTag] = useState('Farm Harvest');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // Product Editing state
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isAddingNewProduct, setIsAddingNewProduct] = useState(false);
+  const [newProductPhotoUrlInput, setNewProductPhotoUrlInput] = useState<string>('');
+
+  // Product Photos Preview Modal state (View Photos from admin catalog)
+  const [previewProductPhotosModal, setPreviewProductPhotosModal] = useState<Product | null>(null);
+  const [previewProductPhotoIndex, setPreviewProductPhotoIndex] = useState<number>(0);
 
   // Temporary Form States for Store Settings
   const [settingsForm, setSettingsForm] = useState<StoreSettings>(storeSettings);
@@ -138,7 +150,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
       id: 'photo-' + Date.now(),
       url: newPhotoUrl.trim(),
       caption: newPhotoCaption.trim() || 'Maknuts Bihar Makhana',
-      tag: newPhotoTag.trim() || 'Farm Harvest',
+      tag: '',
       createdAt: new Date().toISOString()
     };
 
@@ -203,7 +215,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     setTimeout(() => setSettingsSavedToast(false), 2500);
   };
 
-  // Handle Image Upload for Product
+  // Handle Image Upload for Product Primary Image
   const handleProductImageUpload = (file: File, isNew: boolean) => {
     if (file.size > 4 * 1024 * 1024) {
       alert('Image size should be under 4MB');
@@ -213,20 +225,83 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
       if (editingProduct) {
-        setEditingProduct({ ...editingProduct, image: dataUrl });
+        const currentImages = editingProduct.images || (editingProduct.image ? [editingProduct.image] : []);
+        setEditingProduct({
+          ...editingProduct,
+          image: dataUrl,
+          images: [dataUrl, ...currentImages.filter(img => img !== dataUrl)]
+        });
       }
     };
     reader.readAsDataURL(file);
   };
 
+  // Handle Adding Multiple Product Photos from Device
+  const handleAddMultipleProductImages = (files: FileList) => {
+    if (!editingProduct) return;
+    Array.from(files).forEach(file => {
+      if (file.size > 4 * 1024 * 1024) {
+        alert(`${file.name} is larger than 4MB`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target?.result as string;
+        setEditingProduct(prev => {
+          if (!prev) return null;
+          const currentList = prev.images || (prev.image ? [prev.image] : []);
+          return {
+            ...prev,
+            image: prev.image || dataUrl,
+            images: [...currentList, dataUrl]
+          };
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle Add Single Product Photo URL
+  const handleAddProductPhotoUrl = (url: string) => {
+    if (!editingProduct || !url.trim()) return;
+    const cleanUrl = url.trim();
+    const currentList = editingProduct.images || (editingProduct.image ? [editingProduct.image] : []);
+    if (currentList.includes(cleanUrl)) return;
+    setEditingProduct({
+      ...editingProduct,
+      image: editingProduct.image || cleanUrl,
+      images: [...currentList, cleanUrl]
+    });
+  };
+
+  // Handle Remove Photo from Product Gallery
+  const handleRemoveProductPhoto = (urlToRemove: string) => {
+    if (!editingProduct) return;
+    const currentList = editingProduct.images || (editingProduct.image ? [editingProduct.image] : []);
+    const filtered = currentList.filter(u => u !== urlToRemove);
+    const newPrimary = editingProduct.image === urlToRemove ? (filtered[0] || '') : editingProduct.image;
+    setEditingProduct({
+      ...editingProduct,
+      image: newPrimary,
+      images: filtered
+    });
+  };
+
   // Start Editing Product
   const startEditProduct = (prod: Product) => {
-    setEditingProduct({ ...prod });
+    const prodImages = prod.images && prod.images.length > 0 ? prod.images : (prod.image ? [prod.image] : []);
+    setEditingProduct({
+      ...prod,
+      image: prod.image || prodImages[0] || '',
+      images: prodImages
+    });
+    setNewProductPhotoUrlInput('');
     setIsAddingNewProduct(false);
   };
 
   // Start Adding Product
   const startAddProduct = () => {
+    const initialImg = products[0]?.image || 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?auto=format&fit=crop&q=80&w=800';
     setEditingProduct({
       id: '',
       name: '',
@@ -234,14 +309,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
       price: 299,
       originalPrice: 399,
       weight: '250g Pouch',
-      shortDescription: 'Fresh crispy makhana roasted to perfection.',
+      shortDescription: 'Fresh crispy makhana roasted to perfection from Mithila wetlands.',
       fullDescription: '',
-      image: products[0]?.image || '',
+      image: initialImg,
+      images: [initialImg],
       inStock: true,
       stockStatusText: 'In Stock',
       badge: 'New Arrival',
       highlights: ['100% Natural', 'High Protein', 'Gluten Free']
     });
+    setNewProductPhotoUrlInput('');
     setIsAddingNewProduct(true);
   };
 
@@ -253,6 +330,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
       return;
     }
 
+    const currentImages = editingProduct.images && editingProduct.images.length > 0
+      ? editingProduct.images
+      : (editingProduct.image ? [editingProduct.image] : []);
+    const primaryImg = editingProduct.image || currentImages[0] || '';
+    const finalImages = Array.from(new Set([primaryImg, ...currentImages].filter(Boolean)));
+
     if (isAddingNewProduct) {
       const added = await addProduct({
         name: editingProduct.name.trim(),
@@ -262,7 +345,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         weight: editingProduct.weight.trim(),
         shortDescription: editingProduct.shortDescription.trim(),
         fullDescription: editingProduct.fullDescription?.trim(),
-        image: editingProduct.image,
+        image: primaryImg,
+        images: finalImages,
         inStock: editingProduct.inStock,
         stockStatusText: editingProduct.stockStatusText,
         badge: editingProduct.badge,
@@ -270,7 +354,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
       });
       setActiveProductId(added.id);
     } else {
-      await updateProduct(editingProduct);
+      await updateProduct({
+        ...editingProduct,
+        image: primaryImg,
+        images: finalImages
+      });
     }
 
     setEditingProduct(null);
@@ -309,32 +397,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
       <div 
-        className="bg-[#FAF8F5] w-full max-w-4xl rounded-3xl shadow-2xl border border-stone-300 overflow-hidden my-auto max-h-[94vh] flex flex-col"
+        className="bg-[#FAF8F5] w-full max-w-5xl rounded-3xl shadow-2xl border border-stone-300 overflow-hidden my-auto max-h-[94vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        {/* Top Header */}
-        <div className="px-5 py-3.5 bg-emerald-950 text-white flex items-center justify-between shrink-0 border-b border-emerald-900">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center border border-amber-300/30">
-              <Lock className="w-4 h-4" />
+        {/* Top Header - Executive Dark & Emerald Luxury */}
+        <div className="px-4 sm:px-6 py-3 bg-gradient-to-r from-stone-950 via-emerald-950 to-stone-950 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 border-b border-emerald-900/80">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 text-amber-300 flex items-center justify-center border border-amber-300/30 shadow-md">
+              <Sparkles className="w-5 h-5 text-amber-300" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold font-serif leading-tight">
-                Maknuts Admin Control Center
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-extrabold font-serif leading-tight tracking-tight text-white">
+                  Maknuts Admin Control Center
+                </h2>
+                {isAuthenticated && (
+                  <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/90 text-emerald-200 border border-emerald-600/40 text-[10px] font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live Synced
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-emerald-200/80">
-                Manage Products, Prices, UPI, WhatsApp, Banners & Orders
+                Bihar Makhana Enterprise Suite · Operations & Storefront Control
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-emerald-900/60 hover:bg-emerald-900 text-emerald-200 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-2.5 py-1.5 rounded-xl bg-stone-900/80 hover:bg-stone-800 text-stone-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all border border-stone-700/60 cursor-pointer shadow-xs"
+                  title="View Storefront"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
+                  <span className="hidden sm:inline">Storefront</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAuthenticated(false)}
+                  className="px-2.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-200 text-xs font-semibold flex items-center gap-1.5 transition-all border border-rose-800/40 cursor-pointer shadow-xs"
+                  title="Sign out from admin panel"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Logout</span>
+                </button>
+              </>
+            )}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-emerald-900/60 hover:bg-emerald-900 text-emerald-200 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Close admin panel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Auth Gate: Redesigned Luxury Admin Login */}
@@ -494,8 +616,75 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         ) : (
           /* Authenticated Dashboard */
           <div className="flex-1 flex flex-col min-h-0">
+            {/* Executive KPI Ribbon */}
+            <div className="bg-[#FAF8F5] border-b border-stone-200/90 px-3 sm:px-4 py-2.5 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 shrink-0">
+              {/* Metric 1: Products */}
+              <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
+                  <Package className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Products</div>
+                  <div className="text-sm font-black text-stone-900 leading-tight">
+                    {products.length} Items
+                  </div>
+                  <div className="text-[10px] text-emerald-700 font-semibold truncate">
+                    {products.filter(p => p.inStock).length} in stock
+                  </div>
+                </div>
+              </div>
+
+              {/* Metric 2: Orders */}
+              <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-800 shrink-0">
+                  <ShoppingCart className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Orders</div>
+                  <div className="text-sm font-black text-stone-900 leading-tight">
+                    {orders.length} Orders
+                  </div>
+                  <div className="text-[10px] text-amber-700 font-semibold truncate">
+                    {orders.filter(o => o.status === 'Pending').length} pending action
+                  </div>
+                </div>
+              </div>
+
+              {/* Metric 3: Revenue */}
+              <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Gross Sales</div>
+                  <div className="text-sm font-black text-emerald-950 leading-tight">
+                    ₹{orders.filter(o => o.status !== 'Cancelled').reduce((acc, o) => acc + (o.totalAmount || 0), 0).toLocaleString('en-IN')}
+                  </div>
+                  <div className="text-[10px] text-stone-500 font-semibold truncate">
+                    Delivered & active
+                  </div>
+                </div>
+              </div>
+
+              {/* Metric 4: Reviews */}
+              <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-800 shrink-0">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Rating</div>
+                  <div className="text-sm font-black text-stone-900 leading-tight">
+                    {storeSettings.reviewsSection?.ratingText || '4.9 / 5.0'}
+                  </div>
+                  <div className="text-[10px] text-stone-500 font-semibold truncate">
+                    {(storeSettings.reviewsSection?.reviews?.length || 0)} ratings verified
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Tabs Navigation */}
-            <div className="bg-white border-b border-stone-200 px-4 py-2 flex items-center gap-1 overflow-x-auto shrink-0">
+            <div className="bg-white border-b border-stone-200 px-3 sm:px-4 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 scroll-smooth">
               <button
                 onClick={() => handleOpenStoreTab('products')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
@@ -518,6 +707,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
               >
                 <Settings className="w-3.5 h-3.5" />
                 <span>Store & UPI Settings</span>
+              </button>
+
+              <button
+                onClick={() => handleOpenStoreTab('support')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                  activeTab === 'support'
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span>Customer Support</span>
               </button>
 
               <button
@@ -675,18 +876,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               )}
                             </div>
 
-                            {/* In Stock toggle */}
-                            <div className="mt-2 flex items-center gap-2">
+                            {/* In Stock toggle & View Photos button */}
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => updateProduct({ ...prod, inStock: !prod.inStock })}
-                                className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-colors ${
+                                className={`px-2 py-0.5 text-[11px] font-bold rounded-md transition-colors cursor-pointer ${
                                   prod.inStock 
                                     ? 'bg-emerald-100 text-emerald-800' 
                                     : 'bg-rose-100 text-rose-800'
                                 }`}
                               >
                                 {prod.inStock ? '✓ In Stock' : '✗ Out of Stock'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPreviewProductPhotosModal(prod);
+                                  setPreviewProductPhotoIndex(0);
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-stone-100 hover:bg-emerald-50 text-stone-700 hover:text-emerald-900 border border-stone-200 text-[11px] font-bold transition-all cursor-pointer"
+                                title="Click to view all photos for this product in a window"
+                              >
+                                <Camera className="w-3 h-3 text-emerald-700" />
+                                <span>View Photos ({(prod.images && prod.images.length > 0) ? prod.images.length : (prod.image ? 1 : 0)})</span>
                               </button>
                             </div>
                           </div>
@@ -813,28 +1027,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                           </div>
                         </div>
 
-                        {/* Image: URL or Upload */}
-                        <div>
-                          <label className="block text-xs font-semibold text-stone-700 mb-1">
-                            Product Image (Upload from Device or enter URL)
-                          </label>
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={editingProduct.image}
-                              alt="Preview"
-                              className="w-14 h-14 object-contain rounded-xl border border-stone-200 bg-stone-50 p-1 shrink-0"
-                            />
-                            <div className="flex-1 space-y-1.5">
+                        {/* Product Image & Photo Gallery (Multiple Photos Option) */}
+                        <div className="bg-[#FAF8F5] p-3.5 sm:p-4 rounded-2xl border border-stone-200 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <label className="block text-xs font-bold text-stone-900">
+                                Product Images & Photo Gallery
+                              </label>
+                              <p className="text-[11px] text-stone-500">
+                                Give customers multiple photos to view (pack, roasted bowl, raw seeds, nutrition).
+                              </p>
+                            </div>
+                            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0">
+                              {(editingProduct.images?.length || (editingProduct.image ? 1 : 0))} Photos
+                            </span>
+                          </div>
+
+                          {/* Primary Cover Image Card */}
+                          <div className="bg-white p-3 rounded-xl border border-stone-200/90 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <div className="relative shrink-0">
+                              <img
+                                src={editingProduct.image || 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?auto=format&fit=crop&q=80&w=800'}
+                                alt="Primary Preview"
+                                className="w-16 h-16 object-contain rounded-xl border border-stone-200 bg-stone-50 p-1"
+                              />
+                              <span className="absolute -top-1.5 -left-1.5 bg-emerald-800 text-amber-200 text-[9px] font-bold px-1.5 py-0.2 rounded-full shadow-xs">
+                                Primary
+                              </span>
+                            </div>
+                            <div className="flex-1 w-full space-y-1.5">
+                              <div className="text-[11px] font-bold text-stone-700">Primary Cover Photo URL or Upload</div>
                               <input
                                 type="text"
                                 value={editingProduct.image}
-                                onChange={e => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  const cur = editingProduct.images || (editingProduct.image ? [editingProduct.image] : []);
+                                  setEditingProduct({
+                                    ...editingProduct,
+                                    image: val,
+                                    images: cur.includes(val) ? cur : [val, ...cur.filter(u => u !== editingProduct.image)]
+                                  });
+                                }}
                                 className="w-full px-3 py-1.5 rounded-lg border border-stone-300 text-xs"
-                                placeholder="Image URL (http... or /src/...)"
+                                placeholder="Primary image URL (http...)"
                               />
                               <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs cursor-pointer transition-colors">
-                                <ImageIcon className="w-3.5 h-3.5" />
-                                <span>Upload Image File from Device</span>
+                                <ImageIcon className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>Change Primary Image File</span>
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -846,6 +1086,144 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 />
                               </label>
                             </div>
+                          </div>
+
+                          {/* Option to Add More Photos to Catalog */}
+                          <div className="pt-2 border-t border-stone-200 space-y-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-stone-800 flex items-center gap-1">
+                                <Camera className="w-3.5 h-3.5 text-emerald-800" />
+                                <span>Add More Photos to this Product:</span>
+                              </span>
+
+                              {/* Multi-photo file uploader from device */}
+                              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs active:scale-95">
+                                <Plus className="w-3.5 h-3.5 text-amber-300" />
+                                <span>+ Upload Photos from Device</span>
+                                <input
+                                  type="file"
+                                  multiple
+                                  accept="image/*"
+                                  onChange={e => {
+                                    if (e.target.files && e.target.files.length > 0) {
+                                      handleAddMultipleProductImages(e.target.files);
+                                    }
+                                  }}
+                                  className="hidden"
+                                />
+                              </label>
+                            </div>
+
+                            {/* Add Photo by URL */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="Or paste photo image URL (https://...)"
+                                value={newProductPhotoUrlInput}
+                                onChange={e => setNewProductPhotoUrlInput(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (newProductPhotoUrlInput.trim()) {
+                                      handleAddProductPhotoUrl(newProductPhotoUrlInput.trim());
+                                      setNewProductPhotoUrlInput('');
+                                    }
+                                  }
+                                }}
+                                className="flex-1 px-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (newProductPhotoUrlInput.trim()) {
+                                    handleAddProductPhotoUrl(newProductPhotoUrlInput.trim());
+                                    setNewProductPhotoUrlInput('');
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                Add URL
+                              </button>
+                            </div>
+
+                            {/* Quick Add Sample Makhana Photos */}
+                            <div className="bg-stone-100/80 p-2.5 rounded-xl border border-stone-200/70">
+                              <div className="text-[11px] font-bold text-stone-600 mb-1.5 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-amber-600" />
+                                <span>Quick Samples (1-Click Add):</span>
+                              </div>
+                              <div className="flex items-center gap-2 overflow-x-auto py-1">
+                                {SAMPLE_MAKHANA_PHOTOS.map((sample, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => handleAddProductPhotoUrl(sample.url)}
+                                    className="group flex items-center gap-1.5 px-2 py-1 bg-white hover:bg-emerald-50 rounded-lg border border-stone-200 hover:border-emerald-500 text-[11px] font-medium text-stone-700 transition-all shrink-0 cursor-pointer shadow-2xs"
+                                    title="Click to add photo to product gallery"
+                                  >
+                                    <img src={sample.url} alt="" className="w-5 h-5 rounded object-cover" />
+                                    <span>{sample.label}</span>
+                                    <Plus className="w-3 h-3 text-emerald-700 group-hover:scale-125 transition-transform" />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Product Photos Gallery Thumbnails */}
+                            {(editingProduct.images && editingProduct.images.length > 0) && (
+                              <div className="space-y-1.5 pt-1">
+                                <div className="text-[11px] font-bold text-stone-600">
+                                  Current Product Photos ({editingProduct.images.length}):
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {editingProduct.images.map((imgUrl, idx) => {
+                                    const isPrimary = imgUrl === editingProduct.image;
+                                    return (
+                                      <div 
+                                        key={idx} 
+                                        className={`relative group bg-white p-1 rounded-xl border transition-all ${
+                                          isPrimary ? 'border-emerald-700 ring-2 ring-emerald-700/20 shadow-xs' : 'border-stone-200'
+                                        }`}
+                                      >
+                                        <div className="aspect-square rounded-lg overflow-hidden bg-stone-50 flex items-center justify-center">
+                                          <img 
+                                            src={imgUrl} 
+                                            alt={`Photo ${idx + 1}`} 
+                                            className="w-full h-full object-contain"
+                                          />
+                                        </div>
+                                        {isPrimary && (
+                                          <span className="absolute top-2 left-2 bg-emerald-800 text-amber-200 text-[9px] font-extrabold px-1.5 py-0.2 rounded-full shadow-xs">
+                                            Primary
+                                          </span>
+                                        )}
+                                        <div className="mt-1 flex items-center justify-between text-[10px] px-0.5">
+                                          {!isPrimary ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => setEditingProduct({ ...editingProduct, image: imgUrl })}
+                                              className="text-emerald-800 hover:underline font-bold cursor-pointer"
+                                            >
+                                              Set Primary
+                                            </button>
+                                          ) : (
+                                            <span className="text-emerald-800 font-bold">Cover</span>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveProductPhoto(imgUrl)}
+                                            className="text-rose-600 hover:text-rose-800 p-0.5 rounded hover:bg-rose-50 cursor-pointer"
+                                            title="Remove photo"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -908,6 +1286,129 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                           >
                             Save Product
                           </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dedicated Product Photos Viewer Window Modal */}
+                  {previewProductPhotosModal && (
+                    <div 
+                      className="fixed inset-0 z-60 bg-stone-900/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-150"
+                      onClick={() => setPreviewProductPhotosModal(null)}
+                    >
+                      <div 
+                        className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[90vh] flex flex-col"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {/* Top bar */}
+                        <div className="px-5 py-3.5 bg-[#FAF8F5] border-b border-stone-200 flex items-center justify-between shrink-0">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800">
+                              <Camera className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-stone-900 font-serif">
+                                {previewProductPhotosModal.name} — Photos Gallery
+                              </h4>
+                              <p className="text-[11px] text-stone-500">
+                                Photo {previewProductPhotoIndex + 1} of {((previewProductPhotosModal.images && previewProductPhotosModal.images.length > 0) ? previewProductPhotosModal.images : [previewProductPhotosModal.image]).length}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewProductPhotosModal(null)}
+                            className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-colors cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Image stage */}
+                        <div className="relative flex-1 bg-stone-50 p-4 flex items-center justify-center min-h-[260px] max-h-[55vh] overflow-hidden">
+                          {(() => {
+                            const pImgs = (previewProductPhotosModal.images && previewProductPhotosModal.images.length > 0)
+                              ? previewProductPhotosModal.images
+                              : (previewProductPhotosModal.image ? [previewProductPhotosModal.image] : []);
+                            const currentPImg = pImgs[previewProductPhotoIndex] || previewProductPhotosModal.image;
+                            return (
+                              <>
+                                <img
+                                  src={currentPImg}
+                                  alt="Product preview"
+                                  className="max-w-full max-h-[50vh] object-contain rounded-xl drop-shadow-md"
+                                />
+                                {pImgs.length > 1 && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewProductPhotoIndex(prev => (prev > 0 ? prev - 1 : pImgs.length - 1))}
+                                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-stone-800 shadow-md flex items-center justify-center border border-stone-200 cursor-pointer active:scale-95"
+                                    >
+                                      <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewProductPhotoIndex(prev => (prev < pImgs.length - 1 ? prev + 1 : 0))}
+                                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-stone-800 shadow-md flex items-center justify-center border border-stone-200 cursor-pointer active:scale-95"
+                                    >
+                                      <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Thumbnails & footer */}
+                        <div className="p-3.5 bg-[#FAF8F5] border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                          {(() => {
+                            const pImgs = (previewProductPhotosModal.images && previewProductPhotosModal.images.length > 0)
+                              ? previewProductPhotosModal.images
+                              : (previewProductPhotosModal.image ? [previewProductPhotosModal.image] : []);
+                            return pImgs.length > 1 ? (
+                              <div className="flex items-center gap-2 overflow-x-auto max-w-full py-1">
+                                {pImgs.map((img, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setPreviewProductPhotoIndex(idx)}
+                                    className={`w-11 h-11 rounded-lg overflow-hidden border-2 transition-all shrink-0 bg-white p-0.5 cursor-pointer ${
+                                      idx === previewProductPhotoIndex ? 'border-emerald-800 ring-2 ring-emerald-700/20 scale-105' : 'border-stone-200 opacity-60'
+                                    }`}
+                                  >
+                                    <img src={img} alt="" className="w-full h-full object-cover rounded" />
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-stone-500">1 photo for this product</span>
+                            );
+                          })()}
+
+                          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const prodToEdit = previewProductPhotosModal;
+                                setPreviewProductPhotosModal(null);
+                                startEditProduct(prodToEdit);
+                              }}
+                              className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Add / Edit Photos</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewProductPhotosModal(null)}
+                              className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              Close
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1119,6 +1620,206 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                         <p className="text-[10px] text-stone-400 mt-1">
                           Used to log in to this management dashboard.
                         </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: CUSTOMER SUPPORT SETTINGS */}
+              {activeTab === 'support' && (
+                <div className="space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-200">
+                    <div>
+                      <h3 className="text-base font-bold text-stone-900 font-serif flex items-center gap-2">
+                        <Headphones className="w-4 h-4 text-emerald-800" />
+                        <span>Customer Support & Contact Info</span>
+                      </h3>
+                      <p className="text-xs text-stone-500">
+                        Update customer helpline, email, WhatsApp, warehouse address, and support hours.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {settingsSavedToast && (
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1 animate-in fade-in">
+                          <Check className="w-3.5 h-3.5" /> Saved!
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleSaveSettings}
+                        className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Save Support Info</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    {/* Form Fields Column */}
+                    <div className="lg:col-span-7 space-y-4">
+                      {/* Contact Channels Card */}
+                      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 space-y-4">
+                        <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Direct Support Channels</span>
+                        </h4>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
+                              <Phone className="w-3.5 h-3.5 text-stone-500" />
+                              <span>Support Phone / Helpline</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={settingsForm.supportPhone || ''}
+                              onChange={e => setSettingsForm({ ...settingsForm, supportPhone: e.target.value })}
+                              placeholder="+91 78010 51792"
+                              className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-700/30 focus:outline-none"
+                            />
+                            <p className="text-[11px] text-stone-400 mt-1">
+                              Displayed in the footer as "Call: {settingsForm.supportPhone || 'Not set'}".
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
+                              <Mail className="w-3.5 h-3.5 text-stone-500" />
+                              <span>Support Email Address</span>
+                            </label>
+                            <input
+                              type="email"
+                              value={settingsForm.supportEmail || ''}
+                              onChange={e => setSettingsForm({ ...settingsForm, supportEmail: e.target.value })}
+                              placeholder="maknutsmakhana@gmail.com"
+                              className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-700/30 focus:outline-none"
+                            />
+                            <p className="text-[11px] text-stone-400 mt-1">
+                              Displayed in the footer and used for customer service inquiries.
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
+                              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>WhatsApp Support Number</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={settingsForm.whatsappNumber || ''}
+                              onChange={e => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
+                              placeholder="+91 78010 51792"
+                              className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-700/30 focus:outline-none"
+                            />
+                            <p className="text-[11px] text-stone-400 mt-1">
+                              Used for quick WhatsApp order placement and live chat buttons.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Address & Hours Card */}
+                      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 space-y-4">
+                        <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Dispatch Location & Operating Hours</span>
+                        </h4>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-stone-500" />
+                              <span>Customer Support Hours</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={settingsForm.supportHours || ''}
+                              onChange={e => setSettingsForm({ ...settingsForm, supportHours: e.target.value })}
+                              placeholder="Mon - Sun: 9:00 AM - 9:00 PM"
+                              className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-700/30 focus:outline-none"
+                            />
+                            <p className="text-[11px] text-stone-400 mt-1">
+                              Shown with 🕒 icon so customers know operating hours.
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-stone-500" />
+                              <span>Dispatch Warehouse / Store Address</span>
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={settingsForm.address || ''}
+                              onChange={e => setSettingsForm({ ...settingsForm, address: e.target.value })}
+                              placeholder="Maknuts Agri Foods, Darbhanga, Bihar, India - 846004"
+                              className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-700/30 focus:outline-none"
+                            />
+                            <p className="text-[11px] text-stone-400 mt-1">
+                              Physical dispatch address displayed in footer and order documents.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Live Preview Column */}
+                    <div className="lg:col-span-5 space-y-4">
+                      <div className="bg-[#FAF8F5] p-5 rounded-2xl border border-stone-200 space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+                          <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                            <Eye className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>Store Footer Preview</span>
+                          </span>
+                          <span className="text-[10px] text-stone-400">Live Customer View</span>
+                        </div>
+
+                        <div className="bg-white p-4 rounded-xl border border-stone-200/80 space-y-3 text-xs">
+                          <h5 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
+                            Customer Support
+                          </h5>
+
+                          {settingsForm.supportPhone && (
+                            <div className="flex items-center gap-2 text-stone-700">
+                              <Phone className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                              <span className="font-medium">Call: {settingsForm.supportPhone}</span>
+                            </div>
+                          )}
+
+                          {settingsForm.supportEmail && (
+                            <div className="flex items-center gap-2 text-stone-700">
+                              <Mail className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                              <span className="font-medium">{settingsForm.supportEmail}</span>
+                            </div>
+                          )}
+
+                          {settingsForm.address && (
+                            <div className="flex items-start gap-2 text-stone-700">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" />
+                              <span className="leading-snug">{settingsForm.address}</span>
+                            </div>
+                          )}
+
+                          {settingsForm.supportHours && (
+                            <div className="text-[11px] text-stone-500 pt-1 border-t border-stone-100 flex items-center gap-1.5">
+                              <span>🕒 {settingsForm.supportHours}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={handleSaveSettings}
+                            className="w-full py-2.5 px-4 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                            <span>Save Support Info</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1815,7 +2516,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               name: 'Customer Name',
                               location: 'Bangalore',
                               rating: 5,
-                              category: 'Taste & Crunch Quality',
                               comment: 'Super crisp, pure makhana with authentic taste!',
                               createdAt: new Date().toISOString()
                             };
@@ -1849,11 +2549,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                   <span className="text-xs font-bold text-emerald-950">
                                     #{idx + 1}
                                   </span>
-                                  {review.category && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                      {review.category}
-                                    </span>
-                                  )}
                                   {review.createdAt && (
                                     <span className="text-[10px] text-stone-400">
                                       {new Date(review.createdAt).toLocaleDateString('en-IN', {
@@ -2189,29 +2884,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs bg-white"
                             />
                           </div>
-
-                          {/* Category Tag */}
-                          <div>
-                            <label className="block text-xs font-semibold text-stone-700 mb-1">
-                              Category Tag
-                            </label>
-                            <div className="flex flex-wrap gap-1.5">
-                              {['Farm Harvest', 'Batch Roasting', 'Packaging & Purity', 'Customer Moments', 'Snack Bowl'].map(t => (
-                                <button
-                                  key={t}
-                                  type="button"
-                                  onClick={() => setNewPhotoTag(t)}
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                                    newPhotoTag === t
-                                      ? 'bg-emerald-800 text-white shadow-xs'
-                                      : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                                  }`}
-                                >
-                                  {t}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
                         </div>
 
                         {/* Right: Live Preview Box */}
@@ -2221,16 +2893,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                           </label>
                           <div className="w-full aspect-square rounded-2xl border border-stone-300 bg-stone-50 overflow-hidden flex items-center justify-center relative shadow-inner">
                             {newPhotoUrl ? (
-                              <>
-                                <img
-                                  src={newPhotoUrl}
-                                  alt="Preview"
-                                  className="w-full h-full object-cover"
-                                />
-                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-amber-200">
-                                  {newPhotoTag}
-                                </span>
-                              </>
+                              <img
+                                src={newPhotoUrl}
+                                alt="Preview"
+                                className="w-full h-full object-cover"
+                              />
                             ) : (
                               <div className="text-center p-3 text-stone-400">
                                 <Camera className="w-8 h-8 mx-auto mb-1 opacity-50" />
@@ -2287,9 +2954,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                   alt={photo.caption}
                                   className="w-full h-full object-cover"
                                 />
-                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/80 text-amber-200 backdrop-blur-xs">
-                                  {photo.tag}
-                                </span>
                                 <button
                                   type="button"
                                   onClick={() => handleDeletePhotoFromGallery(photo.id, idx)}

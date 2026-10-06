@@ -1,6 +1,6 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { Sparkles, MessageCircle, Mail, MapPin, Lock, ShieldCheck, Heart, MessageSquareHeart } from 'lucide-react';
+import { Sparkles, MessageCircle, Mail, MapPin, Lock, ShieldCheck, Heart, MessageSquareHeart, Phone } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
 
 interface FooterProps {
@@ -56,6 +56,13 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpe
                 <span>WhatsApp: {storeSettings.whatsappNumber}</span>
               </button>
 
+              {storeSettings.supportPhone && storeSettings.supportPhone !== storeSettings.whatsappNumber && (
+                <div className="flex items-center gap-2 text-stone-600">
+                  <Phone className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                  <span>Call: {storeSettings.supportPhone}</span>
+                </div>
+              )}
+
               <div className="flex items-center gap-2 text-stone-600">
                 <Mail className="w-3.5 h-3.5 text-stone-500 shrink-0" />
                 <span>{storeSettings.supportEmail}</span>
@@ -65,6 +72,12 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpe
                 <MapPin className="w-3.5 h-3.5 text-stone-500 shrink-0 mt-0.5" />
                 <span>{storeSettings.address}</span>
               </div>
+
+              {storeSettings.supportHours && (
+                <div className="text-[11px] text-stone-500 pt-0.5">
+                  🕒 {storeSettings.supportHours}
+                </div>
+              )}
             </div>
           </div>
 
@@ -108,19 +121,6 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpe
                   className="hover:text-emerald-900 hover:underline cursor-pointer"
                 >
                   Privacy Policy
-                </button>
-              </li>
-              <li className="pt-2 border-t border-stone-300/60">
-                <button
-                  type="button"
-                  onClick={onOpenFeedback}
-                  className="flex items-center gap-1.5 font-bold text-emerald-900 hover:text-emerald-950 hover:underline cursor-pointer group"
-                >
-                  <MessageSquareHeart className="w-3.5 h-3.5 text-emerald-700 group-hover:scale-110 transition-transform" />
-                  <span>Customer Feedback</span>
-                  <span className="text-[10px] bg-amber-200 text-amber-900 font-extrabold px-1.5 py-0.2 rounded-full ml-1">
-                    Form
-                  </span>
                 </button>
               </li>
             </ul>

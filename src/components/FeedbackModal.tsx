@@ -8,14 +8,6 @@ interface FeedbackModalProps {
   onClose: () => void;
 }
 
-const CATEGORIES = [
-  'Taste & Crunch Quality',
-  'Packaging & Seal',
-  'Delivery & Shipping Speed',
-  'New Flavors Suggestion',
-  'General Experience'
-];
-
 const RATING_LABELS: Record<number, string> = {
   5: '⭐⭐⭐⭐⭐ Outstanding Purity & Crunch!',
   4: '⭐⭐⭐⭐ Great Makhana, Very Happy!',
@@ -29,7 +21,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
 
   const [rating, setRating] = useState<number>(5);
   const [hoverRating, setHoverRating] = useState<number>(0);
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
   const [customerName, setCustomerName] = useState<string>('');
   const [location, setLocation] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
@@ -47,7 +38,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
     if (!file) return;
 
     if (file.size > 4 * 1024 * 1024) {
-      alert('Photo must be less than 4MB');
+      setError('Photo must be less than 4MB');
       return;
     }
 
@@ -77,7 +68,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
         name: customerName.trim(),
         location: location.trim() || 'Verified Buyer',
         rating,
-        category,
         comment: message.trim(),
         phone: phone.trim() || undefined,
         photo: photo || undefined,
@@ -96,7 +86,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
     const text = `*New Customer Review & Feedback for ${storeSettings.shopName}*\n\n` +
       `👤 *Name:* ${customerName}${location ? ` (${location})` : ''}\n` +
       `⭐ *Rating:* ${rating}/5 Stars (${RATING_LABELS[rating]})\n` +
-      `🏷️ *Category:* ${category}\n` +
       (phone ? `📞 *Phone:* ${phone}\n` : '') +
       `💬 *Review / Feedback:* ${message}\n\n` +
       `Thank you for delivering pure Bihar Makhana!`;
@@ -115,33 +104,30 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
       <div 
-        className="relative w-full max-w-lg bg-[#FAF8F5] rounded-3xl shadow-2xl border border-[#DFD5C6] overflow-hidden flex flex-col max-h-[92vh]"
+        className="bg-white w-full max-w-xl rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[88vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 text-white px-5 py-4 flex items-center justify-between">
+        {/* Header - Identical styling to PolicyModal */}
+        <div className="px-5 py-4 bg-[#FAF8F5] border-b border-stone-200 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-amber-300">
-              <MessageSquareHeart className="w-5 h-5 text-amber-300" />
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800">
+              <MessageSquareHeart className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-extrabold text-base sm:text-lg font-serif tracking-tight text-amber-100">
-                Customer Feedback & Experience
+              <h2 className="text-base sm:text-lg font-bold text-stone-900 font-serif">
+                Customer Feedback
               </h2>
-              <p className="text-[11px] text-emerald-200/90 font-medium">
-                Your thoughts help {storeSettings.shopName} serve you the crispest makhana
-              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={handleResetAndClose}
-            className="p-1.5 rounded-full text-emerald-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Close feedback modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -150,11 +136,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
           {isSubmitted ? (
             /* Success State */
             <div className="py-6 text-center space-y-4">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-700 shadow-inner">
-                <CheckCircle2 className="w-9 h-9" />
+              <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-700 shadow-inner">
+                <CheckCircle2 className="w-8 h-8" />
               </div>
               <div>
-                <h3 className="text-xl font-extrabold text-emerald-950 font-serif">
+                <h3 className="text-lg sm:text-xl font-bold text-stone-900 font-serif">
                   Thank You, {customerName}!
                 </h3>
                 <p className="text-xs text-stone-600 mt-1 max-w-sm mx-auto">
@@ -162,16 +148,12 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
                 </p>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-stone-200 max-w-md mx-auto text-left text-xs space-y-2">
+              <div className="bg-[#FAF8F5] p-4 rounded-2xl border border-stone-200 max-w-md mx-auto text-left text-xs space-y-2">
                 <div className="flex items-center justify-between text-stone-500">
                   <span>Rating Given:</span>
                   <span className="font-bold text-amber-600">{'★'.repeat(rating)} ({rating}/5)</span>
                 </div>
-                <div className="flex items-center justify-between text-stone-500">
-                  <span>Category:</span>
-                  <span className="font-semibold text-stone-800">{category}</span>
-                </div>
-                <p className="text-stone-700 italic pt-1 border-t border-stone-100">
+                <p className="text-stone-700 italic pt-1 border-t border-stone-200/60">
                   "{message}"
                 </p>
               </div>
@@ -180,29 +162,29 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
                 <button
                   type="button"
                   onClick={handleSendWhatsAppFeedback}
-                  className="flex-1 py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                  className="flex-1 py-2 px-4 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4 text-emerald-200" />
-                  <span>Send Also to Owner on WhatsApp</span>
+                  <span>Send Also on WhatsApp</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleResetAndClose}
-                  className="py-2.5 px-5 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  className="py-2 px-5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
                 >
-                  Done
+                  Close
                 </button>
               </div>
             </div>
           ) : (
             /* Feedback Form */
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} id="feedback-form" className="space-y-4">
               {/* Star Rating Selection */}
-              <div className="bg-white p-4 rounded-2xl border border-[#E9DFD1] text-center shadow-xs">
-                <label className="block text-xs font-extrabold uppercase tracking-wider text-emerald-950 mb-1">
+              <div className="bg-[#FAF8F5] p-3.5 rounded-2xl border border-stone-200 text-center">
+                <label className="block text-xs font-bold text-stone-800 mb-1">
                   How was your experience?
                 </label>
-                <div className="flex items-center justify-center gap-1.5 py-1">
+                <div className="flex items-center justify-center gap-1 py-1">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
@@ -210,45 +192,22 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
                       onClick={() => setRating(star)}
                       onMouseEnter={() => setHoverRating(star)}
                       onMouseLeave={() => setHoverRating(0)}
-                      className="p-1 transition-transform hover:scale-125 focus:outline-none cursor-pointer"
+                      className="p-1 transition-transform hover:scale-115 focus:outline-none cursor-pointer"
                       aria-label={`Rate ${star} stars`}
                     >
                       <Star
-                        className={`w-7 h-7 sm:w-8 sm:h-8 transition-colors ${
+                        className={`w-6 h-6 sm:w-7 sm:h-7 transition-colors ${
                           (hoverRating || rating) >= star
-                            ? 'fill-amber-400 text-amber-400 drop-shadow-sm'
+                            ? 'fill-amber-400 text-amber-400 drop-shadow-xs'
                             : 'text-stone-300'
                         }`}
                       />
                     </button>
                   ))}
                 </div>
-                <p className="text-xs font-semibold text-emerald-900 mt-1">
+                <p className="text-xs font-medium text-emerald-850 mt-0.5">
                   {RATING_LABELS[hoverRating || rating]}
                 </p>
-              </div>
-
-              {/* Feedback Category */}
-              <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1.5">
-                  Feedback Category
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setCategory(cat)}
-                      className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        category === cat
-                          ? 'bg-emerald-800 text-white shadow-xs'
-                          : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-100'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Feedback Message */}
@@ -260,7 +219,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
                   rows={3}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Tell us what you liked about the crunch, taste, or how we can do even better..."
+                  placeholder="Share your experience with taste, crunch, packaging, or suggestions..."
                   className="w-full px-3.5 py-2.5 bg-white rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-700/30 focus:outline-none"
                   required
                 />
@@ -297,7 +256,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
 
                 <div>
                   <label className="block text-xs font-bold text-stone-700 mb-1">
-                    WhatsApp / Phone (Optional)
+                    Phone / WhatsApp (Optional)
                   </label>
                   <input
                     type="tel"
@@ -310,10 +269,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
               </div>
 
               {/* Optional Photo Attachment */}
-              <div className="bg-white p-3 rounded-2xl border border-stone-200">
+              <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-stone-200">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-stone-700">
-                    Add a Photo of your Makhana (Optional)
+                    Add a Photo (Optional)
                   </span>
                   {photo && (
                     <button
@@ -327,13 +286,13 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
                 </div>
 
                 {photo ? (
-                  <div className="relative w-24 h-24 rounded-xl overflow-hidden border border-stone-200">
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-stone-300">
                     <img src={photo} alt="Feedback preview" className="w-full h-full object-cover" />
                   </div>
                 ) : (
-                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-dashed border-stone-300 hover:border-emerald-600 bg-stone-50 hover:bg-emerald-50/50 cursor-pointer text-xs text-stone-600 transition-colors">
+                  <label className="flex items-center gap-2 p-2 rounded-xl border border-dashed border-stone-300 hover:border-emerald-700 bg-white hover:bg-emerald-50/40 cursor-pointer text-xs text-stone-600 transition-colors">
                     <Upload className="w-4 h-4 text-emerald-700" />
-                    <span>Click to attach photo (bowl, pouch, recipe)</span>
+                    <span>Attach photo (bowl, pouch, crispness)</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -345,32 +304,35 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
               </div>
 
               {error && (
-                <p className="text-xs text-rose-600 font-semibold bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+                <p className="text-xs text-rose-600 font-medium bg-rose-50 p-2.5 rounded-xl border border-rose-200">
                   {error}
                 </p>
               )}
-
-              {/* Submit Buttons */}
-              <div className="pt-2 flex items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 py-3 px-4 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-95"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isSubmitting ? 'Submitting...' : 'Submit Feedback'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetAndClose}
-                  className="py-3 px-4 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </div>
             </form>
           )}
         </div>
+
+        {/* Modal Bottom Bar - Matching PolicyModal */}
+        {!isSubmitted && (
+          <div className="p-4 bg-[#FAF8F5] border-t border-stone-200 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={handleResetAndClose}
+              className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="feedback-form"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>{isSubmitting ? 'Submitting...' : 'Submit Feedback'}</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

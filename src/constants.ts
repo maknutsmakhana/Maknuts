@@ -11,6 +11,12 @@ export const DEFAULT_PRODUCT: Product = {
   shortDescription: 'Naturally grown, sun-dried and gently roasted lotus seeds (Fox Nuts / Phool Makhana). Super crispy, zero trans fats, high protein, and packed with calcium and antioxidants. Sourced directly from Mithila, Bihar farms.',
   fullDescription: 'Maknuts Makhana brings you the purest, crunchiest, and largest grade fox nuts handpicked by artisan farmers. Naturally free from artificial flavors, coloring, and chemical preservatives. A guilt-free superfood snack ideal for tea time, fasting (vrat), gym diet, and daily wellness.',
   image: defaultProductImage,
+  images: [
+    defaultProductImage,
+    'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80'
+  ],
   inStock: true,
   stockStatusText: 'In Stock - Ready to Dispatch',
   badge: 'Premium Handpicked',
@@ -40,6 +46,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   supportPhone: '+91 78010 51792',
   supportEmail: 'maknutsmakhana@gmail.com',
   address: 'Maknuts Agri Foods, Darbhanga, Bihar, India - 846004',
+  supportHours: 'Mon - Sun: 9:00 AM - 9:00 PM',
   adminPassword: 'maknuts123',
   trustBadges: ['Jumbo Grade', 'Sun-Dried & Roasted', 'Zero Trans Fat'],
   buttons: {

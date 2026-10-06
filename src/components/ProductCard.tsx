@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
-import { Check, Plus, Minus, ShoppingBag, MessageCircle, ShieldCheck, Sparkles, AlertCircle, Maximize2 } from 'lucide-react';
+import { Check, Plus, Minus, ShoppingBag, MessageCircle, ShieldCheck, Sparkles, AlertCircle, Maximize2, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
 
 interface ProductCardProps {
@@ -13,6 +13,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
   const { storeSettings } = useStore();
   const [quantity, setQuantity] = useState(1);
   const [isImageZoomed, setIsImageZoomed] = useState(false);
+
+  // Multiple product images resolution
+  const productImages = (product.images && product.images.length > 0)
+    ? product.images
+    : (product.image ? [product.image] : []);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const activeImage = productImages[activeImageIndex] || product.image;
 
   const discountPercent = product.originalPrice > product.price
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -26,6 +33,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
     setQuantity(prev => (prev > 1 ? prev - 1 : 1));
   };
 
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveImageIndex(prev => (prev > 0 ? prev - 1 : productImages.length - 1));
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveImageIndex(prev => (prev < productImages.length - 1 ? prev + 1 : 0));
+  };
+
   const handleDirectWhatsAppQuery = () => {
     const text = `Hello! I want to inquire about purchasing *${product.name} (${product.weight})* priced at ₹${product.price}.`;
     const url = createWhatsAppUrl(storeSettings.whatsappNumber, text);
@@ -35,33 +52,63 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
   return (
     <div className="bg-white rounded-3xl border border-[#E9DFD1] shadow-xl shadow-stone-200/50 overflow-hidden">
       <div className="grid grid-cols-1 md:grid-cols-12 gap-0">
-        {/* Left Side: Product Image Display */}
-        <div className="md:col-span-6 bg-gradient-to-b from-[#F7F4EE] to-[#EFE9DF] p-6 sm:p-8 flex flex-col justify-between items-center relative border-b md:border-b-0 md:border-r border-[#E9DFD1]">
-          {/* Badge */}
-          <div className="w-full flex items-center justify-between mb-2">
+        {/* Left Side: Product Image Display & Thumbnails */}
+        <div className="md:col-span-6 bg-gradient-to-b from-[#F7F4EE] to-[#EFE9DF] p-4 sm:p-6 md:p-8 flex flex-col justify-between items-center relative border-b md:border-b-0 md:border-r border-[#E9DFD1]">
+          {/* Badge & View Photos Button */}
+          <div className="w-full flex items-center justify-between gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-emerald-900 text-amber-200 shadow-sm">
               <Sparkles className="w-3 h-3 text-amber-300" />
               {product.badge || '100% Bihar Harvest'}
             </span>
-            {discountPercent > 0 && (
-              <span className="px-2.5 py-1 rounded-full text-xs font-extrabold bg-amber-500 text-stone-900 shadow-sm">
-                SAVE {discountPercent}%
+            <button
+              type="button"
+              onClick={() => setIsImageZoomed(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-stone-50 text-emerald-950 font-bold text-xs rounded-full border border-stone-300 shadow-xs hover:shadow transition-all cursor-pointer active:scale-95 shrink-0"
+              title="Click to view all photos in a new window"
+            >
+              <Camera className="w-3.5 h-3.5 text-emerald-700" />
+              <span>View Photos</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded-full font-bold">
+                {productImages.length}
               </span>
-            )}
+            </button>
           </div>
 
-          {/* Main Product Image */}
+          {/* Main Product Image Container */}
           <div 
-            className="relative my-4 group cursor-zoom-in w-full max-w-[340px] aspect-square flex items-center justify-center"
+            className="relative my-3 sm:my-4 group cursor-zoom-in w-full max-w-[340px] aspect-square flex items-center justify-center select-none"
             onClick={() => setIsImageZoomed(true)}
           >
             <div className="absolute inset-0 bg-radial from-amber-200/30 via-transparent to-transparent rounded-full blur-2xl -z-0" />
             <img
-              src={product.image}
-              alt={product.name}
+              src={activeImage}
+              alt={`${product.name} - Photo ${activeImageIndex + 1}`}
               referrerPolicy="no-referrer"
-              className="w-full h-full object-contain rounded-2xl drop-shadow-2xl transition-transform duration-300 group-hover:scale-105 z-10"
+              className="w-full h-full object-contain rounded-2xl drop-shadow-2xl transition-all duration-300 group-hover:scale-105 z-10"
             />
+
+            {/* Left / Right Nav Arrows on photo */}
+            {productImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handlePrevImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-stone-700 hover:text-emerald-900 shadow-md flex items-center justify-center transition-all z-20 cursor-pointer active:scale-90"
+                  aria-label="Previous photo"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-stone-700 hover:text-emerald-900 shadow-md flex items-center justify-center transition-all z-20 cursor-pointer active:scale-90"
+                  aria-label="Next photo"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </>
+            )}
+
             <button 
               type="button" 
               className="absolute bottom-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md text-emerald-900 opacity-80 group-hover:opacity-100 transition-opacity z-20"
@@ -70,6 +117,31 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
               <Maximize2 className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Additional Product Photos Thumbnail Strip */}
+          {productImages.length > 1 && (
+            <div className="w-full flex items-center justify-center gap-2 overflow-x-auto py-2 px-1 max-w-full mb-2">
+              {productImages.map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer bg-white p-0.5 ${
+                    idx === activeImageIndex
+                      ? 'border-emerald-800 ring-2 ring-emerald-700/30 scale-105 shadow-sm'
+                      : 'border-stone-200 hover:border-stone-400 opacity-70 hover:opacity-100'
+                  }`}
+                  title={`View photo ${idx + 1}`}
+                >
+                  <img
+                    src={img}
+                    alt={`Thumbnail ${idx + 1}`}
+                    className="w-full h-full object-cover rounded-lg"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Trust points under photo */}
           {storeSettings.trustBadges && storeSettings.trustBadges.length > 0 && (
@@ -84,11 +156,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
         </div>
 
         {/* Right Side: Product Details & Purchase Actions */}
-        <div className="md:col-span-6 p-6 sm:p-8 flex flex-col justify-between">
+        <div className="md:col-span-6 p-5 sm:p-6 md:p-8 flex flex-col justify-between">
           <div>
             {/* Title & Tagline */}
             <div className="mb-3">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 font-serif tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-stone-900 font-serif tracking-tight">
                 {product.name}
               </h1>
               <p className="text-xs sm:text-sm text-emerald-800 font-medium mt-1">
@@ -98,11 +170,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
 
             {/* Price Row */}
             <div className="flex items-baseline gap-3 my-4 p-3.5 bg-[#FAF8F3] rounded-2xl border border-[#ECE4D8]">
-              <div className="text-3xl sm:text-4xl font-extrabold text-emerald-950 font-serif">
+              <div className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-emerald-950 font-serif">
                 ₹{product.price}
               </div>
               {product.originalPrice > product.price && (
-                <div className="text-base text-stone-400 line-through font-semibold">
+                <div className="text-sm sm:text-base text-stone-400 line-through font-semibold">
                   MRP ₹{product.originalPrice}
                 </div>
               )}
@@ -132,7 +204,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
             </div>
 
             {/* Short Description */}
-            <p className="text-sm text-stone-600 leading-relaxed mb-5">
+            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed mb-5">
               {product.shortDescription}
             </p>
 
@@ -166,7 +238,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
                   type="button"
                   onClick={handleDecrement}
                   disabled={quantity <= 1}
-                  className="w-9 h-9 rounded-lg bg-white border border-stone-300 flex items-center justify-center text-stone-700 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-xs"
+                  className="w-10 h-10 rounded-lg bg-white border border-stone-300 flex items-center justify-center text-stone-700 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-xs cursor-pointer"
                   aria-label="Decrease quantity"
                 >
                   <Minus className="w-4 h-4" />
@@ -177,7 +249,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
                 <button
                   type="button"
                   onClick={handleIncrement}
-                  className="w-9 h-9 rounded-lg bg-white border border-stone-300 flex items-center justify-center text-stone-700 hover:bg-stone-100 transition-all active:scale-95 shadow-xs"
+                  className="w-10 h-10 rounded-lg bg-white border border-stone-300 flex items-center justify-center text-stone-700 hover:bg-stone-100 transition-all active:scale-95 shadow-xs cursor-pointer"
                   aria-label="Increase quantity"
                 >
                   <Plus className="w-4 h-4" />
@@ -198,7 +270,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
               type="button"
               onClick={() => onBuyNow(quantity)}
               disabled={!product.inStock}
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-800 hover:from-emerald-900 hover:to-emerald-900 active:scale-[0.99] text-white font-bold text-base sm:text-lg shadow-lg shadow-emerald-900/25 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border border-emerald-600/30"
+              className="w-full py-3.5 sm:py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-800 hover:from-emerald-900 hover:to-emerald-900 active:scale-[0.99] text-white font-bold text-base sm:text-lg shadow-lg shadow-emerald-900/25 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border border-emerald-600/30"
             >
               <ShoppingBag className="w-5 h-5 text-amber-300" />
               <span>{storeSettings.buttons.buyNow || 'Buy Now'}</span>
@@ -210,21 +282,103 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
         </div>
       </div>
 
-      {/* Image Zoom Modal */}
+      {/* Dedicated Product Photos Window Modal */}
       {isImageZoomed && (
         <div 
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out"
+          className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
           onClick={() => setIsImageZoomed(false)}
         >
-          <div className="relative max-w-2xl max-h-[85vh] bg-white p-4 rounded-3xl shadow-2xl">
-            <img
-              src={product.image}
-              alt={product.name}
-              referrerPolicy="no-referrer"
-              className="w-full h-auto max-h-[75vh] object-contain rounded-xl"
-            />
-            <div className="text-center mt-3 text-xs font-semibold text-stone-600">
-              {product.name} · Tap anywhere to close
+          <div 
+            className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-stone-200 overflow-hidden my-auto max-h-[90vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Window Top Bar */}
+            <div className="px-5 py-3.5 bg-[#FAF8F5] border-b border-stone-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-stone-900 font-serif">
+                    {product.name} — Photos
+                  </h3>
+                  <p className="text-[11px] text-stone-500">
+                    Photo {activeImageIndex + 1} of {productImages.length} · {product.weight} Pack
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImageZoomed(false)}
+                className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Close photos window"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Main Stage */}
+            <div className="relative flex-1 bg-stone-50/80 p-4 sm:p-6 flex items-center justify-center min-h-[280px] max-h-[60vh] overflow-hidden">
+              <img
+                src={activeImage}
+                alt={`${product.name} photo ${activeImageIndex + 1}`}
+                referrerPolicy="no-referrer"
+                className="max-w-full max-h-[55vh] object-contain rounded-2xl drop-shadow-lg transition-transform duration-300"
+              />
+
+              {productImages.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handlePrevImage}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-stone-800 hover:text-emerald-900 shadow-md flex items-center justify-center transition-all border border-stone-200 cursor-pointer active:scale-95"
+                    aria-label="Previous photo"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextImage}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 hover:bg-white text-stone-800 hover:text-emerald-900 shadow-md flex items-center justify-center transition-all border border-stone-200 cursor-pointer active:scale-95"
+                    aria-label="Next photo"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Thumbnail Navigation & Footer */}
+            <div className="p-3.5 bg-[#FAF8F5] border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              {productImages.length > 1 ? (
+                <div className="flex items-center gap-2 overflow-x-auto max-w-full py-1">
+                  {productImages.map((img, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setActiveImageIndex(idx)}
+                      className={`relative w-12 h-12 rounded-xl overflow-hidden border-2 transition-all cursor-pointer shrink-0 bg-white p-0.5 ${
+                        idx === activeImageIndex
+                          ? 'border-emerald-800 ring-2 ring-emerald-700/30 scale-105 shadow-xs'
+                          : 'border-stone-300 opacity-60 hover:opacity-100'
+                      }`}
+                      title={`View photo ${idx + 1}`}
+                    >
+                      <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-xs text-stone-500">100% Verified Bihar Makhana Image</span>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsImageZoomed(false)}
+                className="w-full sm:w-auto px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer text-center"
+              >
+                Close Photos
+              </button>
             </div>
           </div>
         </div>

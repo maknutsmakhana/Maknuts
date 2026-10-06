@@ -8,6 +8,7 @@ export interface Product {
   shortDescription: string;
   fullDescription?: string;
   image: string;
+  images?: string[]; // Additional product photos gallery
   inStock: boolean;
   stockStatusText?: string;
   badge?: string; // e.g. "Best Seller" or "Farm Fresh"
@@ -87,6 +88,7 @@ export interface StoreSettings {
   supportPhone: string;
   supportEmail: string;
   address: string;
+  supportHours?: string;
   adminPassword: string;
   trustBadges: string[];
   buttons: {
@@ -143,7 +145,7 @@ export interface Feedback {
   phone?: string;
   email?: string;
   rating: number; // 1 to 5
-  category: string;
+  category?: string;
   message: string;
   photo?: string;
   createdAt: string;

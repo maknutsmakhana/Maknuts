@@ -13,7 +13,7 @@ import { Footer } from './components/Footer';
 import { FeedbackModal } from './components/FeedbackModal';
 import { PhotoGallery } from './components/PhotoGallery';
 import { Order } from './types';
-import { Star, ShieldCheck, Heart, Sparkles, Award } from 'lucide-react';
+import { Star, ShieldCheck, Heart, Sparkles, Award, MessageSquareHeart, ChevronDown, ChevronUp } from 'lucide-react';
 
 function StoreFront() {
   const { activeProduct, products, setActiveProductId, storeSettings } = useStore();
@@ -25,6 +25,7 @@ function StoreFront() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isReviewsExpanded, setIsReviewsExpanded] = useState(false);
   const [trackingQuery, setTrackingQuery] = useState('');
   const [activePolicy, setActivePolicy] = useState<'terms' | 'privacy' | 'returns' | 'shipping' | null>(null);
 
@@ -75,16 +76,16 @@ function StoreFront() {
       />
 
       {/* Main Content Showcase */}
-      <main className="flex-1 max-w-5xl mx-auto px-4 py-6 sm:py-10 w-full space-y-10">
+      <main className="flex-1 max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-8 w-full space-y-6 sm:space-y-10">
         
         {/* If store owner added multiple products, show clean tab bar */}
         {products.length > 1 && (
-          <div className="flex items-center justify-center gap-2 overflow-x-auto pb-2">
+          <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5">
             {products.map(p => (
               <button
                 key={p.id}
                 onClick={() => setActiveProductId(p.id)}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                className={`px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                   p.id === activeProduct.id
                     ? 'bg-emerald-900 text-amber-200 shadow-md border border-emerald-800'
                     : 'bg-white text-stone-600 border border-stone-200 hover:border-emerald-300'
@@ -109,56 +110,139 @@ function StoreFront() {
           <ProductBenefits />
         </section>
 
-        {/* Verified Customer Reviews / Social Proof */}
+        {/* Verified Customer Reviews / Social Proof - Hidden by default, opens to show on click */}
         {storeSettings.reviewsSection && (
-          <section className="bg-white rounded-3xl border border-[#E9DFD1] p-6 sm:p-8 shadow-xs">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-[#E9DFD1]">
-              <div>
-                <div className="flex items-center gap-1.5 text-amber-500 mb-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-amber-400 stroke-amber-400" />
-                  ))}
-                  <span className="text-xs font-bold text-stone-800 ml-1">
-                    {storeSettings.reviewsSection.ratingText || '4.9 / 5.0'}
-                  </span>
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-emerald-950 font-serif">
-                  {storeSettings.reviewsSection.title || 'Loved by Customers Across India'}
-                </h3>
-                {storeSettings.reviewsSection.subtitle && (
-                  <p className="text-xs text-stone-500">
-                    {storeSettings.reviewsSection.subtitle}
-                  </p>
-                )}
-              </div>
-
-              {storeSettings.reviewsSection.guaranteeBadge && (
-                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 shrink-0">
-                  <Award className="w-4 h-4 text-emerald-600" />
-                  <span>{storeSettings.reviewsSection.guaranteeBadge}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              {(storeSettings.reviewsSection.reviews || []).map((review, idx) => (
-                <div key={review.id || idx} className="bg-[#FAF8F5] p-4 rounded-2xl border border-stone-200/80 space-y-2 flex flex-col justify-between">
+          <section className="bg-white rounded-3xl border border-[#E9DFD1] p-5 sm:p-7 shadow-xs">
+            {!isReviewsExpanded ? (
+              /* Collapsed / Hidden State */
+              <div 
+                onClick={() => setIsReviewsExpanded(true)}
+                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer hover:bg-stone-50/70 p-2 rounded-2xl transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100/80 flex items-center justify-center text-amber-700 shrink-0">
+                    <Star className="w-5 h-5 fill-amber-400 stroke-amber-400" />
+                  </div>
                   <div>
-                    <div className="flex text-amber-500 gap-0.5 mb-2">
-                      {[...Array(review.rating || 5)].map((_, i) => (
-                        <Star key={i} className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                      ))}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-amber-600">
+                        ★ {storeSettings.reviewsSection.ratingText || '4.9 / 5.0'}
+                      </span>
+                      <span className="text-[11px] text-stone-400">•</span>
+                      <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        {(storeSettings.reviewsSection.reviews || []).length} Verified Reviews
+                      </span>
                     </div>
-                    <p className="text-stone-700 italic leading-relaxed">
-                      "{review.comment}"
-                    </p>
-                  </div>
-                  <div className="font-bold text-stone-900 pt-2 border-t border-stone-200/60">
-                    — {review.name}{review.location ? `, ${review.location}` : ''}
+                    <h3 className="text-sm sm:text-base font-bold text-emerald-950 font-serif">
+                      {storeSettings.reviewsSection.title || 'Customer Reviews & Feedback'}
+                    </h3>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsFeedbackOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <MessageSquareHeart className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Write Feedback</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsReviewsExpanded(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                  >
+                    <span>View Reviews</span>
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Expanded State */
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[#E9DFD1]">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-amber-500 mb-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} className="w-4 h-4 fill-amber-400 stroke-amber-400" />
+                      ))}
+                      <span className="text-xs font-bold text-stone-800 ml-1">
+                        {storeSettings.reviewsSection.ratingText || '4.9 / 5.0'}
+                      </span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-bold text-emerald-950 font-serif">
+                      {storeSettings.reviewsSection.title || 'Loved by Customers Across India'}
+                    </h3>
+                    {storeSettings.reviewsSection.subtitle && (
+                      <p className="text-xs text-stone-500">
+                        {storeSettings.reviewsSection.subtitle}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {storeSettings.reviewsSection.guaranteeBadge && (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 shrink-0">
+                        <Award className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{storeSettings.reviewsSection.guaranteeBadge}</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsFeedbackOpen(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-800 hover:bg-emerald-900 text-amber-200 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+                    >
+                      <MessageSquareHeart className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Write Review</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsReviewsExpanded(false)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-all cursor-pointer shrink-0"
+                    >
+                      <span>Hide Reviews</span>
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  {(storeSettings.reviewsSection.reviews || []).map((review, idx) => (
+                    <div key={review.id || idx} className="bg-[#FAF8F5] p-4 rounded-2xl border border-stone-200/80 space-y-3 flex flex-col justify-between shadow-2xs">
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-2">
+                          <div className="flex text-amber-500 gap-0.5">
+                            {[...Array(review.rating || 5)].map((_, i) => (
+                              <Star key={i} className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-stone-700 italic leading-relaxed">
+                          "{review.comment}"
+                        </p>
+                        {review.photo && (
+                          <div className="mt-2.5 w-16 h-16 rounded-xl overflow-hidden border border-stone-300 shadow-2xs">
+                            <img src={review.photo} alt="Customer review photo" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="font-bold text-stone-900 pt-2 border-t border-stone-200/60 flex items-center justify-between text-[11px]">
+                        <span>— {review.name}{review.location ? `, ${review.location}` : ''}</span>
+                        <span className="text-emerald-700 font-semibold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded">Verified</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
