@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { X, Star, Heart, CheckCircle2, MessageSquareHeart, Upload, Trash2, Send, MessageCircle } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
+import { compressImageFile } from '../utils/imageCompressor';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -33,20 +34,22 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
 
   if (!isOpen) return null;
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 4 * 1024 * 1024) {
-      setError('Photo must be less than 4MB');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Photo must be less than 10MB');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPhoto(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImageFile(file, 640, 0.68, 45000);
+      setPhoto(compressed);
+      setError('');
+    } catch {
+      setError('Could not process photo');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

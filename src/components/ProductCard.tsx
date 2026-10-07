@@ -54,24 +54,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
       <div className="grid grid-cols-1 md:grid-cols-12 gap-0">
         {/* Left Side: Product Image Display & Thumbnails */}
         <div className="md:col-span-6 bg-gradient-to-b from-[#F7F4EE] to-[#EFE9DF] p-4 sm:p-6 md:p-8 flex flex-col justify-between items-center relative border-b md:border-b-0 md:border-r border-[#E9DFD1]">
-          {/* Badge & View Photos Button */}
+          {/* Badge */}
           <div className="w-full flex items-center justify-between gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-emerald-900 text-amber-200 shadow-sm">
               <Sparkles className="w-3 h-3 text-amber-300" />
               {product.badge || '100% Bihar Harvest'}
             </span>
-            <button
-              type="button"
-              onClick={() => setIsImageZoomed(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-stone-50 text-emerald-950 font-bold text-xs rounded-full border border-stone-300 shadow-xs hover:shadow transition-all cursor-pointer active:scale-95 shrink-0"
-              title="Click to view all photos in a new window"
-            >
-              <Camera className="w-3.5 h-3.5 text-emerald-700" />
-              <span>View Photos</span>
-              <span className="text-[10px] bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded-full font-bold">
-                {productImages.length}
-              </span>
-            </button>
           </div>
 
           {/* Main Product Image Container */}

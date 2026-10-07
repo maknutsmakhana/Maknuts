@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Product, StoreSettings, Order, Feedback, ReviewItem, GalleryPhoto } from '../types';
 import { DEFAULT_PRODUCT, DEFAULT_SETTINGS } from '../constants';
+import { optimizeProductForFirestore, optimizeSettingsForFirestore } from '../utils/imageCompressor';
 import { 
   collection, 
   doc, 
@@ -82,7 +83,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (snapshot.empty) {
           // Initial online seeding with Maknuts Makhana product
           try {
-            await setDoc(doc(db, productsPath, DEFAULT_PRODUCT.id), DEFAULT_PRODUCT);
+            const safeDefault = await optimizeProductForFirestore(DEFAULT_PRODUCT);
+            await setDoc(doc(db, productsPath, DEFAULT_PRODUCT.id), sanitizeForFirestore(safeDefault));
           } catch (e) {
             handleFirestoreError(e, OperationType.WRITE, `${productsPath}/${DEFAULT_PRODUCT.id}`);
           }
@@ -213,8 +215,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: newId,
     };
     try {
-      await setDoc(doc(db, 'products', newId), sanitizeForFirestore(newProduct));
-      return newProduct;
+      const safeProduct = await optimizeProductForFirestore(newProduct);
+      await setDoc(doc(db, 'products', newId), sanitizeForFirestore(safeProduct));
+      return safeProduct;
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `products/${newId}`);
     }
@@ -223,7 +226,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Firebase Update Product
   const updateProduct = async (updated: Product): Promise<void> => {
     try {
-      await setDoc(doc(db, 'products', updated.id), sanitizeForFirestore(updated));
+      const safeUpdated = await optimizeProductForFirestore(updated);
+      await setDoc(doc(db, 'products', updated.id), sanitizeForFirestore(safeUpdated));
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `products/${updated.id}`);
     }
@@ -277,7 +281,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
     try {
-      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(newSettings));
+      const safeSettings = await optimizeSettingsForFirestore(newSettings);
+      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(safeSettings));
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'settings/store');
     }
@@ -455,7 +460,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setStoreSettings(newSettings);
     try {
-      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(newSettings));
+      const safeSettings = await optimizeSettingsForFirestore(newSettings);
+      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(safeSettings));
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'settings/store');
     }
@@ -477,7 +483,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setStoreSettings(newSettings);
     try {
-      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(newSettings));
+      const safeSettings = await optimizeSettingsForFirestore(newSettings);
+      await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore(safeSettings));
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'settings/store');
     }
@@ -492,7 +499,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       prodSnap.forEach(d => batch.delete(d.ref));
       await batch.commit();
 
-      await setDoc(doc(db, 'products', DEFAULT_PRODUCT.id), DEFAULT_PRODUCT);
+      const safeDefault = await optimizeProductForFirestore(DEFAULT_PRODUCT);
+      await setDoc(doc(db, 'products', DEFAULT_PRODUCT.id), sanitizeForFirestore(safeDefault));
 
       // 2. Reset settings to default settings
       await setDoc(doc(db, 'settings', 'store'), DEFAULT_SETTINGS);

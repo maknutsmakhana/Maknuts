@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { Sparkles, Truck } from 'lucide-react';
+import { Truck } from 'lucide-react';
+import maknutsLogo from '../assets/images/regenerated_image_1791357700332.png';
 
 interface HeaderProps {
   onOpenAdmin?: () => void;
@@ -17,8 +18,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTracking }) => {
       <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-4">
         {/* Brand / Logo */}
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 flex items-center justify-center text-amber-300 shadow-md shadow-emerald-900/10 border border-emerald-700/30 shrink-0">
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 fill-amber-300/30" />
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl overflow-hidden shadow-md shadow-emerald-900/15 border border-emerald-700/30 shrink-0 bg-emerald-950 flex items-center justify-center p-0.5">
+            <img
+              src={maknutsLogo}
+              alt={storeSettings.shopName || 'Maknuts Logo'}
+              className="w-full h-full object-cover rounded-[10px]"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

@@ -9,6 +9,8 @@ import {
   Phone, Mail, MapPin, Clock, Headphones, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
+import { compressImageFile, optimizeProductForFirestore } from '../utils/imageCompressor';
+import maknutsLogo from '../assets/images/regenerated_image_1791357700332.png';
 
 const SAMPLE_MAKHANA_PHOTOS = [
   { label: 'Crispy Roasted Bowl', url: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?auto=format&fit=crop&q=80&w=800' },
@@ -70,6 +72,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isAddingNewProduct, setIsAddingNewProduct] = useState(false);
   const [newProductPhotoUrlInput, setNewProductPhotoUrlInput] = useState<string>('');
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [saveProductError, setSaveProductError] = useState('');
 
   // Product Photos Preview Modal state (View Photos from admin catalog)
   const [previewProductPhotosModal, setPreviewProductPhotosModal] = useState<Product | null>(null);
@@ -128,19 +132,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   };
 
   // Handle Gallery Photo File Upload
-  const handleGalleryFileUpload = (file: File) => {
-    if (file.size > 4 * 1024 * 1024) {
-      setAuthError('Photo size should be under 4MB');
-      return;
-    }
+  const handleGalleryFileUpload = async (file: File) => {
     setIsUploadingPhoto(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      setNewPhotoUrl(dataUrl);
+    try {
+      const compressedDataUrl = await compressImageFile(file, 640, 0.68, 45000);
+      setNewPhotoUrl(compressedDataUrl);
+    } catch (err) {
+      console.error('Failed to process photo', err);
+      setAuthError('Could not process photo file. Please try a different image.');
+    } finally {
       setIsUploadingPhoto(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   // Add Photo to Gallery
@@ -215,50 +217,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     setTimeout(() => setSettingsSavedToast(false), 2500);
   };
 
-  // Handle Image Upload for Product Primary Image
-  const handleProductImageUpload = (file: File, isNew: boolean) => {
-    if (file.size > 4 * 1024 * 1024) {
-      alert('Image size should be under 4MB');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
+  // Handle Image Upload for Product Primary Image (Compressed)
+  const handleProductImageUpload = async (file: File, isNew: boolean) => {
+    try {
+      const dataUrl = await compressImageFile(file, 640, 0.68, 45000);
       if (editingProduct) {
         const currentImages = editingProduct.images || (editingProduct.image ? [editingProduct.image] : []);
         setEditingProduct({
           ...editingProduct,
           image: dataUrl,
-          images: [dataUrl, ...currentImages.filter(img => img !== dataUrl)]
+          images: [dataUrl, ...currentImages.filter(img => img !== dataUrl)].slice(0, 10)
         });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed to compress product image', err);
+    }
   };
 
-  // Handle Adding Multiple Product Photos from Device
-  const handleAddMultipleProductImages = (files: FileList) => {
+  // Handle Adding Multiple Product Photos from Device (Compressed)
+  const handleAddMultipleProductImages = async (files: FileList) => {
     if (!editingProduct) return;
-    Array.from(files).forEach(file => {
-      if (file.size > 4 * 1024 * 1024) {
-        alert(`${file.name} is larger than 4MB`);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = e => {
-        const dataUrl = e.target?.result as string;
-        setEditingProduct(prev => {
-          if (!prev) return null;
-          const currentList = prev.images || (prev.image ? [prev.image] : []);
-          return {
-            ...prev,
-            image: prev.image || dataUrl,
-            images: [...currentList, dataUrl]
-          };
-        });
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      const compressedList = await Promise.all(
+        Array.from(files).map(f => compressImageFile(f, 640, 0.68, 45000))
+      );
+      setEditingProduct(prev => {
+        if (!prev) return null;
+        const currentList = prev.images || (prev.image ? [prev.image] : []);
+        const merged = [...currentList, ...compressedList];
+        const unique = Array.from(new Set(merged.filter(Boolean)));
+        return {
+          ...prev,
+          image: prev.image || compressedList[0] || '',
+          images: unique.slice(0, 10)
+        };
+      });
+    } catch (err) {
+      console.error('Failed to compress multiple product images', err);
+    }
   };
 
   // Handle Add Single Product Photo URL
@@ -330,39 +326,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
       return;
     }
 
-    const currentImages = editingProduct.images && editingProduct.images.length > 0
-      ? editingProduct.images
-      : (editingProduct.image ? [editingProduct.image] : []);
-    const primaryImg = editingProduct.image || currentImages[0] || '';
-    const finalImages = Array.from(new Set([primaryImg, ...currentImages].filter(Boolean)));
+    setIsSavingProduct(true);
+    setSaveProductError('');
 
-    if (isAddingNewProduct) {
-      const added = await addProduct({
+    try {
+      const currentImages = editingProduct.images && editingProduct.images.length > 0
+        ? editingProduct.images
+        : (editingProduct.image ? [editingProduct.image] : []);
+      const primaryImg = editingProduct.image || currentImages[0] || '';
+      const finalImages = Array.from(new Set([primaryImg, ...currentImages].filter(Boolean))).slice(0, 10);
+
+      const productPayload = {
         name: editingProduct.name.trim(),
-        tagline: editingProduct.tagline.trim(),
+        tagline: (editingProduct.tagline || '').trim(),
         price: Number(editingProduct.price) || 0,
         originalPrice: Number(editingProduct.originalPrice) || 0,
-        weight: editingProduct.weight.trim(),
-        shortDescription: editingProduct.shortDescription.trim(),
-        fullDescription: editingProduct.fullDescription?.trim(),
+        weight: (editingProduct.weight || '').trim(),
+        shortDescription: (editingProduct.shortDescription || '').trim(),
+        fullDescription: (editingProduct.fullDescription || '').trim(),
         image: primaryImg,
         images: finalImages,
         inStock: editingProduct.inStock,
-        stockStatusText: editingProduct.stockStatusText,
-        badge: editingProduct.badge,
-        highlights: editingProduct.highlights,
-      });
-      setActiveProductId(added.id);
-    } else {
-      await updateProduct({
-        ...editingProduct,
-        image: primaryImg,
-        images: finalImages
-      });
-    }
+        stockStatusText: editingProduct.stockStatusText || 'In Stock',
+        badge: editingProduct.badge || 'New Arrival',
+        highlights: editingProduct.highlights || [],
+      };
 
-    setEditingProduct(null);
-    setIsAddingNewProduct(false);
+      if (isAddingNewProduct) {
+        const added = await addProduct(productPayload);
+        if (added) {
+          setActiveProductId(added.id);
+        }
+      } else {
+        await updateProduct({
+          ...editingProduct,
+          ...productPayload,
+          id: editingProduct.id
+        });
+      }
+
+      setEditingProduct(null);
+      setIsAddingNewProduct(false);
+    } catch (err: any) {
+      console.error('Failed to save product:', err);
+      setSaveProductError('Could not save product: ' + (err?.message || 'Storage error'));
+    } finally {
+      setIsSavingProduct(false);
+    }
   };
 
   // Export Data Download
@@ -405,8 +415,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
         {/* Top Header - Executive Dark & Emerald Luxury */}
         <div className="px-4 sm:px-6 py-3 bg-gradient-to-r from-stone-950 via-emerald-950 to-stone-950 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 border-b border-emerald-900/80">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-800 to-emerald-950 text-amber-300 flex items-center justify-center border border-amber-300/30 shadow-md">
-              <Sparkles className="w-5 h-5 text-amber-300" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-300/30 shadow-md bg-emerald-950 flex items-center justify-center p-0.5 shrink-0">
+              <img
+                src={maknutsLogo}
+                alt="Maknuts Admin"
+                className="w-full h-full object-cover rounded-[10px]"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -1270,21 +1285,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                           </div>
                         </div>
 
+                        {saveProductError && (
+                          <div className="p-3 mb-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                            <span>{saveProductError}</span>
+                          </div>
+                        )}
+
                         {/* Modal Action Buttons */}
                         <div className="pt-3 border-t border-stone-200 flex justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => setEditingProduct(null)}
-                            className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold"
+                            disabled={isSavingProduct}
+                            onClick={() => {
+                              setEditingProduct(null);
+                              setSaveProductError('');
+                            }}
+                            className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold disabled:opacity-50"
                           >
                             Cancel
                           </button>
                           <button
                             type="button"
+                            disabled={isSavingProduct}
                             onClick={handleSaveProduct}
-                            className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold shadow-xs"
+                            className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold shadow-xs flex items-center gap-2 disabled:opacity-50"
                           >
-                            Save Product
+                            {isSavingProduct ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                <span>Optimizing & Saving...</span>
+                              </>
+                            ) : (
+                              <span>Save Product</span>
+                            )}
                           </button>
                         </div>
                       </div>

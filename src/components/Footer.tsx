@@ -1,7 +1,8 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { Sparkles, MessageCircle, Mail, MapPin, Lock, ShieldCheck, Heart, MessageSquareHeart, Phone } from 'lucide-react';
+import { MessageCircle, Mail, MapPin, Lock, ShieldCheck, Heart, MessageSquareHeart, Phone } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
+import maknutsLogo from '../assets/images/regenerated_image_1791357700332.png';
 
 interface FooterProps {
   onOpenAdmin: () => void;
@@ -25,8 +26,13 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpe
           {/* Brand Col */}
           <div className="md:col-span-5 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-900 flex items-center justify-center text-amber-300">
-                <Sparkles className="w-4 h-4 text-amber-300" />
+              <div className="w-8 h-8 rounded-lg overflow-hidden border border-emerald-800/40 shrink-0 bg-emerald-950 flex items-center justify-center p-0.5 shadow-xs">
+                <img
+                  src={maknutsLogo}
+                  alt={storeSettings.shopName || 'Maknuts Logo'}
+                  className="w-full h-full object-cover rounded-md"
+                  referrerPolicy="no-referrer"
+                />
               </div>
               <span className="font-extrabold text-xl font-serif text-emerald-950">
                 {storeSettings.shopName}
