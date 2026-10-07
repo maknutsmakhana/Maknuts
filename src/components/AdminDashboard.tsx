@@ -2146,7 +2146,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 }
                               })}
                               className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
-                              placeholder="e.g. Crafted for pure health by Saroj 😊"
+                              placeholder="e.g. From our heart to your bowl, crafted with Love by Saroj"
                             />
                           </div>
 

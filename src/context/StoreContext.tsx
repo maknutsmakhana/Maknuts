@@ -149,7 +149,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 ? data.gallerySection.photos
                 : DEFAULT_SETTINGS.gallerySection.photos
             },
-            footerText: { ...DEFAULT_SETTINGS.footerText, ...(data.footerText || {}) },
+            footerText: { 
+              ...DEFAULT_SETTINGS.footerText, 
+              ...(data.footerText || {}),
+              craftedBy: (!data.footerText?.craftedBy || data.footerText.craftedBy === 'Crafted for pure health by Saroj 😊')
+                ? DEFAULT_SETTINGS.footerText.craftedBy
+                : data.footerText.craftedBy
+            },
             policies: { ...DEFAULT_SETTINGS.policies, ...(data.policies || {}) },
           });
         }

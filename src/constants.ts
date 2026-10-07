@@ -159,7 +159,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   footerText: {
     about: 'Bringing you 100% natural, farm-fresh jumbo Phool Makhana from the pristine wetlands of Bihar. Crispy, high-protein superfood snacks for your healthy daily life.',
     qualityPromise: '100% Quality Guaranteed · Hygienic Sealed Packaging',
-    craftedBy: 'Crafted for pure health by Saroj 😊',
+    craftedBy: 'From our heart to your bowl, crafted with Love by Saroj',
     copyright: 'All rights reserved.'
   },
   policies: {

@@ -133,26 +133,32 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpe
           </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-stone-500">
-          <div>
-            © {new Date().getFullYear()} {storeSettings.shopName}. {storeSettings.footerText?.copyright || 'All rights reserved.'}
-          </div>
+        {/* Bottom bar matching user specification */}
+        <div className="pt-6">
+          <div className="border border-[#D8CABE] rounded-xl sm:rounded-2xl bg-white/75 overflow-hidden text-center text-xs text-stone-700 shadow-2xs divide-y divide-[#D8CABE]">
+            {/* Top row: Copyright & Admin Login */}
+            <div className="py-2.5 px-4 flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 leading-normal">
+              <span>
+                © {new Date().getFullYear()} {storeSettings.shopName.includes('Makhana') ? storeSettings.shopName : `${storeSettings.shopName} Makhana`}. {storeSettings.footerText?.copyright || 'All rights reserved.'}
+              </span>
+              <button
+                type="button"
+                onClick={onOpenAdmin}
+                className="inline-flex items-center gap-1.5 text-stone-700 hover:text-emerald-900 font-semibold transition-colors cursor-pointer group"
+                title="Store Admin Dashboard"
+              >
+                <Lock className="w-3.5 h-3.5 text-stone-600 group-hover:text-emerald-800" />
+                <span>Admin Login</span>
+              </button>
+            </div>
 
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5 text-stone-400">
-              {storeSettings.footerText?.craftedBy || 'Crafted for pure health by Saroj 😊'} <Heart className="w-3 h-3 text-rose-500 fill-rose-500/50" />
-            </span>
-
-            <button
-              type="button"
-              onClick={onOpenAdmin}
-              className="flex items-center gap-1 text-stone-500 hover:text-emerald-900 font-semibold transition-colors cursor-pointer"
-              title="Store Admin Dashboard"
-            >
-              <Lock className="w-3.5 h-3.5 text-stone-500" />
-              <span>Admin Login</span>
-            </button>
+            {/* Bottom row: Crafted with Love by Saroj */}
+            <div className="py-2.5 px-4 flex items-center justify-center gap-1.5 text-stone-800 font-medium">
+              <span>
+                {storeSettings.footerText?.craftedBy || 'From our heart to your bowl, crafted with Love by Saroj'}
+              </span>
+              <Heart className="w-3.5 h-3.5 text-rose-600 fill-rose-600 shrink-0" />
+            </div>
           </div>
         </div>
       </div>
