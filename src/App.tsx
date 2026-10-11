@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { StoreProvider, useStore } from './context/StoreContext';
 import { Header } from './components/Header';
 import { Banner } from './components/Banner';
+import { HeroSection } from './components/HeroSection';
+import { PromoBannerSection } from './components/PromoBannerSection';
 import { ProductCard } from './components/ProductCard';
+import { FoodComplianceSection } from './components/FoodComplianceSection';
 import { ProductBenefits } from './components/ProductBenefits';
+import { FaqSection } from './components/FaqSection';
+import { FloatingWhatsApp } from './components/FloatingWhatsApp';
 import { CheckoutModal } from './components/CheckoutModal';
 import { OrderSuccessModal } from './components/OrderSuccessModal';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -25,7 +30,25 @@ function StoreFront() {
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [trackingQuery, setTrackingQuery] = useState('');
-  const [activePolicy, setActivePolicy] = useState<'terms' | 'privacy' | 'returns' | 'shipping' | null>(null);
+  const [trackingOrderId, setTrackingOrderId] = useState('');
+  const [trackingPhone, setTrackingPhone] = useState('');
+  const [activePolicy, setActivePolicy] = useState<'terms' | 'privacy' | 'returns' | 'shipping' | 'cancellation' | null>(null);
+
+  // Dynamic SEO Synchronization
+  useEffect(() => {
+    if (storeSettings.seo?.pageTitle) {
+      document.title = storeSettings.seo.pageTitle;
+    } else if (storeSettings.shopName) {
+      document.title = `${storeSettings.shopName} — ${storeSettings.tagline || '100% Pure Jumbo Makhana'}`;
+    }
+
+    if (storeSettings.seo?.metaDescription) {
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) {
+        meta.setAttribute('content', storeSettings.seo.metaDescription);
+      }
+    }
+  }, [storeSettings.seo, storeSettings.shopName, storeSettings.tagline]);
 
   // Hash listener for admin & tracking (e.g. #admin or #track=MK10001 in URL)
   useEffect(() => {
@@ -56,28 +79,61 @@ function StoreFront() {
     setSuccessOrder(order);
   };
 
-  const handleOpenTrackingWithQuery = (query: string = '') => {
-    setTrackingQuery(query);
+  const handleOpenTrackingWithQuery = (orderId: string = '', phone: string = '') => {
+    setTrackingOrderId(orderId);
+    setTrackingPhone(phone);
+    setTrackingQuery(orderId);
     setIsTrackingOpen(true);
+  };
+
+  const visibility = storeSettings.sectionVisibility || {
+    announcementBar: true,
+    headerNavigation: true,
+    heroBanner: true,
+    promoBanner: true,
+    productShowcase: true,
+    benefitsSection: true,
+    foodCompliance: true,
+    gallerySection: true,
+    reviewsSection: true,
+    faqSection: true,
+    aboutSection: true,
+    contactSection: true,
+    floatingWhatsApp: true,
+    footer: true,
   };
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-stone-800 flex flex-col font-sans selection:bg-amber-200 selection:text-emerald-950">
       {/* Top Notification Banner with Track Link */}
-      <Banner onOpenTracking={() => handleOpenTrackingWithQuery('')} />
+      {visibility.announcementBar !== false && (
+        <Banner onOpenTracking={() => handleOpenTrackingWithQuery('')} />
+      )}
 
       {/* Navigation Header with Track Order button */}
-      <Header
-        onOpenAdmin={() => setIsAdminOpen(true)}
-        onOpenTracking={() => handleOpenTrackingWithQuery('')}
-        onOpenPolicies={policy => setActivePolicy(policy)}
-      />
+      {visibility.headerNavigation !== false && (
+        <Header
+          onOpenAdmin={() => setIsAdminOpen(true)}
+          onOpenTracking={() => handleOpenTrackingWithQuery('')}
+          onOpenPolicies={policy => setActivePolicy(policy)}
+        />
+      )}
 
       {/* Main Content Showcase */}
-      <main className="flex-1 max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-8 w-full space-y-6 sm:space-y-10">
+      <main className="flex-1 max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-8 w-full space-y-6 sm:space-y-8">
         
+        {/* Hero Section */}
+        {visibility.heroBanner !== false && (
+          <HeroSection onShopNow={() => handleBuyNow(1)} />
+        )}
+
+        {/* Promotional Banner */}
+        {visibility.promoBanner !== false && (
+          <PromoBannerSection />
+        )}
+
         {/* If store owner added multiple products, show clean tab bar */}
-        {products.length > 1 && (
+        {products.length > 1 && visibility.productShowcase !== false && (
           <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5">
             {products.map(p => (
               <button
@@ -96,28 +152,55 @@ function StoreFront() {
         )}
 
         {/* Featured Product Card */}
-        <section aria-label="Main Product Showcase">
-          <ProductCard
-            product={activeProduct}
-            onBuyNow={handleBuyNow}
-          />
-        </section>
+        {visibility.productShowcase !== false && (
+          <section aria-label="Main Product Showcase">
+            <ProductCard
+              product={activeProduct}
+              onBuyNow={handleBuyNow}
+            />
+          </section>
+        )}
+
+        {/* Food & FSSAI Compliance Section */}
+        {visibility.foodCompliance !== false && (
+          <section aria-label="Food and Compliance Information">
+            <FoodComplianceSection />
+          </section>
+        )}
 
         {/* Nutritional & Quality Benefits */}
-        <section aria-label="Product Benefits & Purity">
-          <ProductBenefits />
-        </section>
+        {visibility.benefitsSection !== false && (
+          <section aria-label="Product Benefits & Purity">
+            <ProductBenefits />
+          </section>
+        )}
 
         {/* Side-by-Side Photo Gallery & Verified Reviews Hub */}
-        <GalleryAndReviewsHub onOpenFeedback={() => setIsFeedbackOpen(true)} />
+        {(visibility.gallerySection !== false || visibility.reviewsSection !== false) && (
+          <GalleryAndReviewsHub onOpenFeedback={() => setIsFeedbackOpen(true)} />
+        )}
+
+        {/* Frequently Asked Questions Section */}
+        {visibility.faqSection !== false && (
+          <section aria-label="Frequently Asked Questions">
+            <FaqSection />
+          </section>
+        )}
       </main>
 
       {/* Store Footer */}
-      <Footer
-        onOpenAdmin={() => setIsAdminOpen(true)}
-        onOpenPolicy={policy => setActivePolicy(policy)}
-        onOpenFeedback={() => setIsFeedbackOpen(true)}
-      />
+      {visibility.footer !== false && (
+        <Footer
+          onOpenAdmin={() => setIsAdminOpen(true)}
+          onOpenPolicy={policy => setActivePolicy(policy)}
+          onOpenFeedback={() => setIsFeedbackOpen(true)}
+        />
+      )}
+
+      {/* Floating WhatsApp Action Button */}
+      {visibility.floatingWhatsApp !== false && (
+        <FloatingWhatsApp />
+      )}
 
       {/* Customer Feedback Modal */}
       <FeedbackModal
@@ -139,9 +222,9 @@ function StoreFront() {
         order={successOrder}
         storeSettings={storeSettings}
         onClose={() => setSuccessOrder(null)}
-        onTrackOrder={(orderNum) => {
+        onTrackOrder={(orderNum, phone) => {
           setSuccessOrder(null);
-          handleOpenTrackingWithQuery(orderNum);
+          handleOpenTrackingWithQuery(orderNum, phone || '');
         }}
       />
 
@@ -149,10 +232,12 @@ function StoreFront() {
       <TrackingModal
         isOpen={isTrackingOpen}
         onClose={() => setIsTrackingOpen(false)}
+        initialOrderId={trackingOrderId}
+        initialPhone={trackingPhone}
         initialQuery={trackingQuery}
       />
 
-      {/* Password-protected Admin Dashboard */}
+      {/* Password-protected Admin Dashboard (Store Control Center) */}
       <AdminDashboard
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}

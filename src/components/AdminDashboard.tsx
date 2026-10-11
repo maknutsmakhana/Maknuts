@@ -1,15 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Product, StoreSettings, Order, GalleryPhoto, Feedback } from '../types';
+import { Product, StoreSettings, Order, GalleryPhoto, Feedback, PaymentStatus, OrderAuditEntry, ReviewItem } from '../types';
 import { 
-  X, Lock, Key, Plus, Trash2, Edit3, Save, Check, 
+  X, Lock, Key, Plus, Trash2, Edit3, Save, Check, Copy,
   RotateCcw, Package, Settings, ShoppingCart, FileText, 
   Download, Upload, Eye, EyeOff, MessageCircle, AlertTriangle, ExternalLink, Image as ImageIcon, Truck,
   Star, Sparkles, Award, Leaf, Heart, Camera, ShieldCheck, KeyRound, MessageSquareHeart, AlertCircle, RefreshCw, ArrowRight,
-  Phone, Mail, MapPin, Clock, Headphones, ChevronLeft, ChevronRight
+  Phone, Mail, MapPin, Clock, Headphones, ChevronLeft, ChevronRight, MoreHorizontal,
+  Calculator, Tag, BadgePercent, History, Unlock, ShieldAlert, CreditCard,
+  Search, Filter, ArrowUpDown, Store, CheckCircle2, Menu, LayoutDashboard
 } from 'lucide-react';
+import { AdminSidebar, AdminTab } from './admin/AdminSidebar';
+import { AdminOverviewTab } from './admin/AdminOverviewTab';
+import { AdminStorefrontTab } from './admin/AdminStorefrontTab';
+import { AdminCouponsTab } from './admin/AdminCouponsTab';
+import { AdminFoodComplianceTab } from './admin/AdminFoodComplianceTab';
+import { AdminPaymentsTab } from './admin/AdminPaymentsTab';
+import { AdminCustomersTab } from './admin/AdminCustomersTab';
+import { AdminMediaTab } from './admin/AdminMediaTab';
+import { AdminWhatsAppTab } from './admin/AdminWhatsAppTab';
+import { AdminSeoTab } from './admin/AdminSeoTab';
+import { AdminReportsTab } from './admin/AdminReportsTab';
+import { 
+  downloadOrderInvoicePdf, 
+  downloadOrdersReportPdf, 
+  downloadStoreExecutiveReportPdf, 
+  downloadFoodCompliancePdf 
+} from '../utils/pdfGenerator';
 import { createWhatsAppUrl } from '../utils/whatsapp';
 import { compressImageFile, optimizeProductForFirestore } from '../utils/imageCompressor';
+import { calculateOrderPricing, round2, validatePriceInput } from '../utils/pricing';
+import { calculateReviewStats } from '../utils/reviews';
 import maknutsLogo from '../assets/images/regenerated_image_1791357700332.png';
 
 const SAMPLE_MAKHANA_PHOTOS = [
@@ -32,12 +53,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     storeSettings, 
     orders, 
     feedbacks,
+    reviews,
+    approveReview,
+    rejectReview,
+    deleteReview,
+    updateReviewText,
+    updateStoreReply,
     addProduct, 
     updateProduct, 
     deleteProduct, 
     updateSettings, 
     updateOrderStatus, 
+    updatePaymentStatus,
     updateOrder,
+    updateOrderFinancials,
     deleteOrder, 
     clearAllOrders, 
     deleteFeedback,
@@ -46,20 +75,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     deleteGalleryPhoto,
     resetToDefaults, 
     exportData, 
-    importData 
+    importData,
+    adminUser,
+    isAdmin,
+    isAuthLoading,
+    adminLogin,
+    adminRegister,
+    adminResetPassword,
+    adminLogout
   } = useStore();
 
-  // Authentication
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Authentication - email is empty by default so it is not shown
+  const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showSettingsPassword, setShowSettingsPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [capsLockActive, setCapsLockActive] = useState(false);
+  const [showMoreMobileTabs, setShowMoreMobileTabs] = useState(false);
 
-  // Active Tab - with dedicated Customer Support tab
-  const [activeTab, setActiveTab] = useState<'products' | 'store' | 'support' | 'homepage' | 'benefits' | 'reviews' | 'gallery' | 'orders' | 'policies' | 'backup'>('products');
+  // Authenticated state derived from Firebase Auth
+  const isAuthenticated = Boolean(adminUser);
+
+  // Active Tab - with all Store Control Center tabs
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [galleryDeleteToast, setGalleryDeleteToast] = useState(false);
   const [reviewDeleteToast, setReviewDeleteToast] = useState(false);
 
@@ -83,6 +126,71 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   const [settingsForm, setSettingsForm] = useState<StoreSettings>(storeSettings);
   const [settingsSavedToast, setSettingsSavedToast] = useState(false);
 
+  // Dedicated Pricing & Order Controls State
+  const [pricingForm, setPricingForm] = useState<{
+    productPrice: number;
+    originalPrice: number;
+    discountEnabled: boolean;
+    discountType: 'percentage' | 'fixed';
+    discountValue: number;
+    deliveryCharge: number;
+    freeDeliveryThreshold: number;
+    freeDeliveryAllOrders: boolean;
+    minOrderQuantity: number;
+    maxOrderQuantity: number;
+    orderIdPrefix: string;
+    enableCod: boolean;
+    enableUpi: boolean;
+  }>({
+    productPrice: activeProduct?.price || 299,
+    originalPrice: activeProduct?.originalPrice || 399,
+    discountEnabled: Boolean(storeSettings.discountEnabled),
+    discountType: storeSettings.discountType || 'percentage',
+    discountValue: storeSettings.discountValue ?? 0,
+    deliveryCharge: storeSettings.deliveryCharge ?? 40,
+    freeDeliveryThreshold: storeSettings.freeDeliveryThreshold ?? 600,
+    freeDeliveryAllOrders: Boolean(storeSettings.freeDeliveryAllOrders),
+    minOrderQuantity: storeSettings.minOrderQuantity || 1,
+    maxOrderQuantity: storeSettings.maxOrderQuantity || 20,
+    orderIdPrefix: storeSettings.orderIdPrefix || 'MK',
+    enableCod: storeSettings.enableCod !== undefined ? Boolean(storeSettings.enableCod) : true,
+    enableUpi: storeSettings.enableUpi !== undefined ? Boolean(storeSettings.enableUpi) : true,
+  });
+  const [previewTestQty, setPreviewTestQty] = useState<number>(1);
+  const [pricingSavedToast, setPricingSavedToast] = useState(false);
+  const [pricingError, setPricingError] = useState('');
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
+
+  // Order Financial Editing State
+  const [editingFinancialOrderId, setEditingFinancialOrderId] = useState<string | null>(null);
+  const [financialForm, setFinancialForm] = useState<{
+    quantity: number;
+    unitPrice: number;
+    discountAmount: number;
+    deliveryCharge: number;
+    adminNote: string;
+  }>({
+    quantity: 1,
+    unitPrice: 0,
+    discountAmount: 0,
+    deliveryCharge: 0,
+    adminNote: '',
+  });
+  const [unlockedDeliveredOrderIds, setUnlockedDeliveredOrderIds] = useState<Set<string>>(new Set());
+  const [warningUnlockOrder, setWarningUnlockOrder] = useState<Order | null>(null);
+  const [confirmFinancialOrder, setConfirmFinancialOrder] = useState<{
+    order: Order;
+    newQuantity: number;
+    newUnitPrice: number;
+    newDiscountAmount: number;
+    newDeliveryCharge: number;
+    newTotal: number;
+    adminNote: string;
+    changesSummary: string[];
+  } | null>(null);
+  const [isSavingFinancials, setIsSavingFinancials] = useState(false);
+  const [financialSaveToast, setFinancialSaveToast] = useState(false);
+
   // Screenshot viewer modal
   const [previewScreenshotUrl, setPreviewScreenshotUrl] = useState<string | null>(null);
 
@@ -102,33 +210,172 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     statusNotes: '',
   });
 
+  // Customer Reviews & Feedback Moderation State
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [reviewSearch, setReviewSearch] = useState<string>('');
+  const [reviewSort, setReviewSort] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest');
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editingReviewText, setEditingReviewText] = useState<string>('');
+  const [replyingReviewId, setReplyingReviewId] = useState<string | null>(null);
+  const [replyingText, setReplyingText] = useState<string>('');
+  const [reviewToast, setReviewToast] = useState<{ message: string; type: 'success' | 'danger' | 'info' } | null>(null);
+  const [expandedOriginalId, setExpandedOriginalId] = useState<string | null>(null);
+
+  const triggerReviewToast = (message: string, type: 'success' | 'danger' | 'info' = 'success') => {
+    setReviewToast({ message, type });
+    setTimeout(() => setReviewToast(null), 3000);
+  };
+
+  const handleApproveReview = async (reviewId: string) => {
+    try {
+      await approveReview(reviewId);
+      triggerReviewToast('Review approved! Now published on the public store.', 'success');
+    } catch (e: any) {
+      triggerReviewToast('Failed to approve review: ' + (e?.message || 'Error'), 'danger');
+    }
+  };
+
+  const handleRejectReview = async (reviewId: string) => {
+    try {
+      await rejectReview(reviewId);
+      triggerReviewToast('Review rejected and hidden from public store.', 'info');
+    } catch (e: any) {
+      triggerReviewToast('Failed to reject review: ' + (e?.message || 'Error'), 'danger');
+    }
+  };
+
+  const handleDeleteSpamReview = async (reviewId: string) => {
+    try {
+      await deleteReview(reviewId);
+      triggerReviewToast('Spam review permanently deleted.', 'danger');
+    } catch (e: any) {
+      triggerReviewToast('Failed to delete review: ' + (e?.message || 'Error'), 'danger');
+    }
+  };
+
+  const handleSaveEditedReviewText = async (reviewId: string) => {
+    if (!editingReviewText.trim()) {
+      triggerReviewToast('Review text cannot be empty.', 'danger');
+      return;
+    }
+    try {
+      await updateReviewText(reviewId, editingReviewText);
+      setEditingReviewId(null);
+      setEditingReviewText('');
+      triggerReviewToast('Review text updated! Original text preserved.', 'success');
+    } catch (e: any) {
+      triggerReviewToast('Failed to save review text: ' + (e?.message || 'Error'), 'danger');
+    }
+  };
+
+  const handleSaveStoreReply = async (reviewId: string) => {
+    try {
+      await updateStoreReply(reviewId, replyingText);
+      setReplyingReviewId(null);
+      setReplyingText('');
+      triggerReviewToast(replyingText.trim() ? 'Store reply published to review!' : 'Store reply removed.', 'success');
+    } catch (e: any) {
+      triggerReviewToast('Failed to save store reply: ' + (e?.message || 'Error'), 'danger');
+    }
+  };
+
+  const handleRemoveStoreReply = async (reviewId: string) => {
+    try {
+      await updateStoreReply(reviewId, null);
+      triggerReviewToast('Store reply removed.', 'info');
+    } catch (e: any) {
+      triggerReviewToast('Failed to remove store reply: ' + (e?.message || 'Error'), 'danger');
+    }
+  };
+
   // Automatically synchronize settings form when storeSettings loads/updates
   useEffect(() => {
     setSettingsForm(storeSettings);
-  }, [storeSettings]);
+    setPricingForm({
+      productPrice: activeProduct?.price || 299,
+      originalPrice: activeProduct?.originalPrice || 399,
+      discountEnabled: Boolean(storeSettings.discountEnabled),
+      discountType: storeSettings.discountType || 'percentage',
+      discountValue: storeSettings.discountValue ?? 0,
+      deliveryCharge: storeSettings.deliveryCharge ?? 40,
+      freeDeliveryThreshold: storeSettings.freeDeliveryThreshold ?? 600,
+      freeDeliveryAllOrders: Boolean(storeSettings.freeDeliveryAllOrders),
+      minOrderQuantity: storeSettings.minOrderQuantity || 1,
+      maxOrderQuantity: storeSettings.maxOrderQuantity || 20,
+      orderIdPrefix: storeSettings.orderIdPrefix || 'MK',
+      enableCod: storeSettings.enableCod !== undefined ? Boolean(storeSettings.enableCod) : true,
+      enableUpi: storeSettings.enableUpi !== undefined ? Boolean(storeSettings.enableUpi) : true,
+    });
+  }, [storeSettings, activeProduct]);
 
   // Sync settings form when settings change or tab changes
   const handleOpenStoreTab = (tab: typeof activeTab) => {
     setSettingsForm(storeSettings);
+    setPricingForm({
+      productPrice: activeProduct?.price || 299,
+      originalPrice: activeProduct?.originalPrice || 399,
+      discountEnabled: Boolean(storeSettings.discountEnabled),
+      discountType: storeSettings.discountType || 'percentage',
+      discountValue: storeSettings.discountValue ?? 0,
+      deliveryCharge: storeSettings.deliveryCharge ?? 40,
+      freeDeliveryThreshold: storeSettings.freeDeliveryThreshold ?? 600,
+      freeDeliveryAllOrders: Boolean(storeSettings.freeDeliveryAllOrders),
+      minOrderQuantity: storeSettings.minOrderQuantity || 1,
+      maxOrderQuantity: storeSettings.maxOrderQuantity || 20,
+      orderIdPrefix: storeSettings.orderIdPrefix || 'MK',
+      enableCod: storeSettings.enableCod !== undefined ? Boolean(storeSettings.enableCod) : true,
+      enableUpi: storeSettings.enableUpi !== undefined ? Boolean(storeSettings.enableUpi) : true,
+    });
     setActiveTab(tab);
   };
 
   if (!isOpen) return null;
 
-  // Handle Login
-  const handleLogin = (e: React.FormEvent) => {
+  // Handle Login using Firebase Auth
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!emailInput.trim()) {
+      setAuthError('Please enter admin email address.');
+      return;
+    }
+    if (!passwordInput) {
+      setAuthError('Please enter admin password.');
+      return;
+    }
+
     setIsLoggingIn(true);
     setAuthError('');
-    setTimeout(() => {
-      if (passwordInput === storeSettings.adminPassword || passwordInput === 'maknuts123') {
-        setIsAuthenticated(true);
-        setAuthError('');
+
+    try {
+      await adminLogin(emailInput.trim(), passwordInput);
+      setAuthError('');
+    } catch (err: any) {
+      console.warn('Admin login attempt result:', err?.code || err);
+      if (err?.code === 'auth/operation-not-allowed') {
+        setAuthError('Authentication method restricted. Please sign in with authorized store credentials (maknutsmakhana@gmail.com).');
+      } else if (err?.code === 'auth/user-not-found' || err?.code === 'auth/invalid-credential') {
+        // If first-time initialization for the authorized store owner email, register initial admin
+        const authorizedEmail = (storeSettings.supportEmail || 'maknutsmakhana@gmail.com').toLowerCase();
+        if (emailInput.trim().toLowerCase() === authorizedEmail) {
+          try {
+            await adminRegister(emailInput.trim(), passwordInput);
+            setAuthError('');
+            return;
+          } catch (regErr: any) {
+            console.error('Registration fallback error:', regErr);
+          }
+        }
+        setAuthError('Invalid admin email or password. Please verify credentials.');
+      } else if (err?.code === 'auth/wrong-password') {
+        setAuthError('Incorrect admin password. Please try again.');
+      } else if (err?.code === 'auth/too-many-requests') {
+        setAuthError('Access temporarily blocked due to repeated failed attempts. Please wait a few moments.');
       } else {
-        setAuthError('Incorrect admin password. Please verify and try again.');
+        setAuthError(err?.message || 'Authentication failed. Please verify credentials.');
       }
+    } finally {
       setIsLoggingIn(false);
-    }, 250);
+    }
   };
 
   // Handle Gallery Photo File Upload
@@ -375,6 +622,155 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     }
   };
 
+  // Save Pricing & Order Rules Settings
+  const handleSavePricing = async () => {
+    setIsSavingPricing(true);
+    setPricingError('');
+    try {
+      const priceNum = Math.max(0, round2(Number(pricingForm.productPrice) || 0));
+      if (priceNum <= 0) throw new Error('Selling Price must be greater than 0');
+
+      const mrpNum = Math.max(priceNum, round2(Number(pricingForm.originalPrice) || priceNum));
+
+      const deliveryNum = Math.max(0, round2(Number(pricingForm.deliveryCharge) || 0));
+      const thresholdNum = Math.max(0, round2(Number(pricingForm.freeDeliveryThreshold) || 0));
+
+      let discNum = Math.max(0, round2(Number(pricingForm.discountValue) || 0));
+      if (pricingForm.discountType === 'percentage' && discNum > 100) {
+        throw new Error('Percentage discount cannot exceed 100%');
+      }
+      if (pricingForm.discountType === 'fixed' && discNum > priceNum) {
+        throw new Error(`Fixed discount (₹${discNum}) cannot exceed the product selling price (₹${priceNum})`);
+      }
+
+      const minQ = Math.max(1, Math.floor(Number(pricingForm.minOrderQuantity) || 1));
+      const maxQ = Math.max(minQ, Math.floor(Number(pricingForm.maxOrderQuantity) || 20));
+      const prefix = (pricingForm.orderIdPrefix || 'MK').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'MK';
+
+      // 1. Update Firestore settings
+      await updateSettings({
+        deliveryCharge: deliveryNum,
+        freeDeliveryThreshold: thresholdNum,
+        freeDeliveryAllOrders: Boolean(pricingForm.freeDeliveryAllOrders),
+        discountEnabled: Boolean(pricingForm.discountEnabled),
+        discountType: pricingForm.discountType,
+        discountValue: discNum,
+        minOrderQuantity: minQ,
+        maxOrderQuantity: maxQ,
+        orderIdPrefix: prefix,
+        enableCod: Boolean(pricingForm.enableCod),
+        enableUpi: Boolean(pricingForm.enableUpi),
+      });
+
+      // 2. Update active product price & MRP in Firestore
+      if (activeProduct) {
+        await updateProduct({
+          ...activeProduct,
+          price: priceNum,
+          originalPrice: mrpNum,
+        });
+      }
+
+      setPricingSavedToast(true);
+      setTimeout(() => setPricingSavedToast(false), 2500);
+    } catch (err: any) {
+      console.error('Failed to save pricing settings', err);
+      setPricingError(err.message || 'Failed to save pricing settings. Please verify monetary inputs.');
+    } finally {
+      setIsSavingPricing(false);
+    }
+  };
+
+  // Initiate Financial Modification for an Order
+  const handleStartEditFinancials = (order: Order) => {
+    // If completed/delivered order and not yet unlocked by admin, prompt warning dialog first
+    if ((order.status === 'Delivered' || order.paymentStatus === 'COD Collected' || order.paymentStatus === 'Paid / Verified') && !unlockedDeliveredOrderIds.has(order.id)) {
+      setWarningUnlockOrder(order);
+      return;
+    }
+
+    setEditingFinancialOrderId(order.id);
+    setFinancialForm({
+      quantity: order.quantity || 1,
+      unitPrice: order.unitPrice || 0,
+      discountAmount: order.discountAmount ?? 0,
+      deliveryCharge: order.deliveryCharge || 0,
+      adminNote: '',
+    });
+  };
+
+  // Confirm Unlock of Delivered Order
+  const handleConfirmUnlockDeliveredOrder = () => {
+    if (!warningUnlockOrder) return;
+    setUnlockedDeliveredOrderIds(prev => new Set([...prev, warningUnlockOrder.id]));
+    setEditingFinancialOrderId(warningUnlockOrder.id);
+    setFinancialForm({
+      quantity: warningUnlockOrder.quantity || 1,
+      unitPrice: warningUnlockOrder.unitPrice || 0,
+      discountAmount: warningUnlockOrder.discountAmount ?? 0,
+      deliveryCharge: warningUnlockOrder.deliveryCharge || 0,
+      adminNote: '',
+    });
+    setWarningUnlockOrder(null);
+  };
+
+  // Request Save Financials -> triggers comparison confirmation modal
+  const handleRequestSaveFinancials = (order: Order) => {
+    const newQty = Math.max(1, Math.floor(Number(financialForm.quantity) || 1));
+    const newUnitPrice = Math.max(0, round2(Number(financialForm.unitPrice) || 0));
+    const newBase = round2(newUnitPrice * newQty);
+    const newDiscount = Math.max(0, Math.min(newBase, round2(Number(financialForm.discountAmount) || 0)));
+    const newSub = Math.max(0, round2(newBase - newDiscount));
+    const newDelivery = Math.max(0, round2(Number(financialForm.deliveryCharge) || 0));
+    const newTotal = Math.max(0, round2(newSub + newDelivery));
+
+    const changesSummary: string[] = [];
+    if (order.quantity !== newQty) changesSummary.push(`Quantity: ${order.quantity} → ${newQty}`);
+    if (order.unitPrice !== newUnitPrice) changesSummary.push(`Unit Price: ₹${order.unitPrice} → ₹${newUnitPrice}`);
+    if ((order.discountAmount ?? 0) !== newDiscount) changesSummary.push(`Discount: ₹${order.discountAmount ?? 0} → ₹${newDiscount}`);
+    if (order.deliveryCharge !== newDelivery) changesSummary.push(`Delivery: ₹${order.deliveryCharge} → ₹${newDelivery}`);
+    if (order.totalAmount !== newTotal) changesSummary.push(`Total Amount: ₹${order.totalAmount} → ₹${newTotal}`);
+
+    setConfirmFinancialOrder({
+      order,
+      newQuantity: newQty,
+      newUnitPrice,
+      newDiscountAmount: newDiscount,
+      newDeliveryCharge: newDelivery,
+      newTotal,
+      adminNote: financialForm.adminNote.trim(),
+      changesSummary,
+    });
+  };
+
+  // Final Execution of Financial Update with Audit History
+  const handleExecuteSaveFinancials = async () => {
+    if (!confirmFinancialOrder) return;
+    setIsSavingFinancials(true);
+    try {
+      await updateOrderFinancials(
+        confirmFinancialOrder.order.id,
+        {
+          quantity: confirmFinancialOrder.newQuantity,
+          unitPrice: confirmFinancialOrder.newUnitPrice,
+          discountAmount: confirmFinancialOrder.newDiscountAmount,
+          deliveryCharge: confirmFinancialOrder.newDeliveryCharge,
+        },
+        confirmFinancialOrder.adminNote
+      );
+
+      setEditingFinancialOrderId(null);
+      setConfirmFinancialOrder(null);
+      setFinancialSaveToast(true);
+      setTimeout(() => setFinancialSaveToast(false), 2500);
+    } catch (err: any) {
+      console.error('Failed to update order financials', err);
+      alert('Could not update order financials: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsSavingFinancials(false);
+    }
+  };
+
   // Export Data Download
   const handleDownloadBackup = () => {
     const dataStr = exportData();
@@ -407,15 +803,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 overflow-hidden bg-stone-900/80 backdrop-blur-xs flex items-center justify-center p-0 sm:p-2 md:p-3 animate-in fade-in duration-150">
       <div 
-        className="bg-[#FAF8F5] w-full max-w-5xl rounded-3xl shadow-2xl border border-stone-300 overflow-hidden my-auto max-h-[94vh] flex flex-col"
+        className="bg-[#FAF8F5] w-full h-[100dvh] sm:h-[96vh] sm:max-w-7xl lg:max-w-[96vw] rounded-none sm:rounded-3xl shadow-2xl border-0 sm:border border-stone-300 overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        {/* Top Header - Executive Dark & Emerald Luxury */}
-        <div className="px-4 sm:px-6 py-3 bg-gradient-to-r from-stone-950 via-emerald-950 to-stone-950 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 border-b border-emerald-900/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-300/30 shadow-md bg-emerald-950 flex items-center justify-center p-0.5 shrink-0">
+        {/* Top Header - Mobile-first Executive Dark & Emerald Luxury */}
+        <div className="px-3 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-stone-950 via-emerald-950 to-stone-950 text-white flex items-center justify-between gap-2 shrink-0 border-b border-emerald-900/80">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl overflow-hidden border border-amber-300/30 shadow-md bg-emerald-950 flex items-center justify-center p-0.5 shrink-0">
               <img
                 src={maknutsLogo}
                 alt="Maknuts Admin"
@@ -423,31 +819,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 referrerPolicy="no-referrer"
               />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-extrabold font-serif leading-tight tracking-tight text-white">
-                  Maknuts Admin Control Center
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm sm:text-lg font-extrabold font-serif leading-tight tracking-tight text-white truncate">
+                  Admin Control Center
                 </h2>
                 {isAuthenticated && (
-                  <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-900/90 text-emerald-200 border border-emerald-600/40 text-[10px] font-bold">
+                  <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-emerald-900/90 text-emerald-200 border border-emerald-600/40 text-[9px] sm:text-[10px] font-bold shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Live Synced
+                    <span className="hidden xs:inline">Synced</span>
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-emerald-200/80">
-                Bihar Makhana Enterprise Suite · Operations & Storefront Control
+              <p className="text-[10px] sm:text-[11px] text-emerald-200/80 truncate hidden sm:block">
+                Operations & Storefront Control
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {isAuthenticated && (
               <>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-2.5 py-1.5 rounded-xl bg-stone-900/80 hover:bg-stone-800 text-stone-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-all border border-stone-700/60 cursor-pointer shadow-xs"
+                  className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 px-2.5 py-1.5 rounded-xl bg-stone-900/80 hover:bg-stone-800 text-stone-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border border-stone-700/60 cursor-pointer shadow-xs active:scale-95"
                   title="View Storefront"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
@@ -455,8 +851,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsAuthenticated(false)}
-                  className="px-2.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-200 text-xs font-semibold flex items-center gap-1.5 transition-all border border-rose-800/40 cursor-pointer shadow-xs"
+                  onClick={async () => {
+                    await adminLogout();
+                  }}
+                  className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 px-2.5 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border border-rose-800/40 cursor-pointer shadow-xs active:scale-95"
                   title="Sign out from admin panel"
                 >
                   <Lock className="w-3.5 h-3.5" />
@@ -466,366 +864,378 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
             )}
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-emerald-900/60 hover:bg-emerald-900 text-emerald-200 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-emerald-900/60 hover:bg-emerald-900 text-emerald-200 hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95"
               aria-label="Close admin panel"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4 sm:w-4 sm:h-4" />
             </button>
           </div>
         </div>
 
-        {/* Auth Gate: Redesigned Luxury Admin Login */}
+        {/* Auth Gate: Redesigned Mobile-Friendly Luxury Admin Login */}
         {!isAuthenticated ? (
-          <div className="relative p-6 sm:p-10 max-w-md w-full mx-auto my-auto text-center space-y-5 animate-in zoom-in-95 duration-200">
-            {/* Ambient emerald glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -z-0" />
-
-            {/* Security Badge Pill */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 border border-amber-300/80 text-[11px] font-bold text-amber-900 shadow-xs uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600 fill-amber-500/30" />
-              <span>Official Admin Portal</span>
-            </div>
-
-            {/* Shield Emblem */}
-            <div className="relative w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-800 to-emerald-950 mx-auto flex items-center justify-center text-amber-300 shadow-xl border border-emerald-700/50 shadow-emerald-900/30">
-              <ShieldCheck className="w-10 h-10 text-amber-300" />
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-900 border border-emerald-500 flex items-center justify-center text-emerald-200 shadow-sm">
-                <Lock className="w-3 h-3 text-amber-200" />
+          <div className="flex-1 overflow-y-auto p-4 sm:p-8 flex items-center justify-center">
+            <div className="relative max-w-sm sm:max-w-md w-full mx-auto my-auto text-center space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-200">
+              {/* Security Shield & Title */}
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-800 to-emerald-950 mx-auto flex items-center justify-center text-amber-300 shadow-xl border border-emerald-700/50 shadow-emerald-900/30">
+                <ShieldCheck className="w-8 h-8 sm:w-10 sm:h-10 text-amber-300" />
+                <div className="absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-emerald-900 border border-emerald-500 flex items-center justify-center text-emerald-200 shadow-sm">
+                  <Lock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-200" />
+                </div>
               </div>
-            </div>
 
-            {/* Title & Description */}
-            <div>
-              <h3 className="text-2xl font-black text-emerald-950 font-serif tracking-tight">
-                {storeSettings.shopName} Control Panel
-              </h3>
-              <p className="text-xs text-stone-600 mt-1.5 leading-relaxed max-w-xs mx-auto">
-                Enter your authorized admin credentials to manage products, photos, orders, customer feedback & store settings.
-              </p>
-            </div>
-
-            {/* Trust Indicators */}
-            <div className="grid grid-cols-3 gap-2 py-2 px-3 bg-white/80 backdrop-blur-xs rounded-2xl border border-stone-200/80 text-[10px] font-semibold text-stone-600">
-              <div className="flex flex-col items-center gap-1">
-                <Lock className="w-3.5 h-3.5 text-emerald-700" />
-                <span>256-Bit SSL</span>
-              </div>
-              <div className="flex flex-col items-center gap-1 border-x border-stone-200">
-                <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Live Sync</span>
-              </div>
-              <div className="flex flex-col items-center gap-1">
-                <KeyRound className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Master Role</span>
-              </div>
-            </div>
-
-            {/* Login Form */}
-            <form onSubmit={handleLogin} className="space-y-3.5 text-left">
               <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1.5">
-                  Admin Master Password
-                </label>
-                <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none">
-                    <KeyRound className="w-4 h-4 text-emerald-700" />
-                  </div>
+                <h3 className="text-xl sm:text-2xl font-black text-emerald-950 font-serif tracking-tight">
+                  Admin Control Center
+                </h3>
+                <p className="text-xs text-stone-600 mt-1 leading-relaxed max-w-xs mx-auto">
+                  Enter your credentials to manage products, orders, delivery tracking & store settings.
+                </p>
+              </div>
+
+              {/* Trust Indicators */}
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 py-2 px-3 bg-white/80 backdrop-blur-xs rounded-2xl border border-stone-200/80 text-[10px] font-semibold text-stone-600">
+                <div className="flex flex-col items-center gap-0.5">
+                  <Lock className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>256-Bit SSL</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5 border-x border-stone-200">
+                  <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Live Sync</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <KeyRound className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Master Role</span>
+                </div>
+              </div>
+
+              {/* Login Form */}
+              <form onSubmit={handleLogin} className="space-y-3 sm:space-y-3.5 text-left bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-xs">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">
+                    Admin Email
+                  </label>
                   <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your admin password"
-                    value={passwordInput}
-                    onChange={e => setPasswordInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.getModifierState && e.getModifierState('CapsLock')) {
-                        setCapsLockActive(true);
-                      } else {
-                        setCapsLockActive(false);
-                      }
-                    }}
-                    onKeyUp={e => {
-                      if (e.getModifierState && e.getModifierState('CapsLock')) {
-                        setCapsLockActive(true);
-                      } else {
-                        setCapsLockActive(false);
-                      }
-                    }}
-                    className="w-full pl-10 pr-20 py-3 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 transition-all font-mono"
-                    autoFocus
+                    type="email"
+                    placeholder="Enter admin email address"
+                    value={emailInput}
+                    onChange={e => setEmailInput(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 transition-all min-h-[44px]"
+                    required
+                    autoComplete="email"
                   />
-                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    {passwordInput && (
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">
+                    Admin Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none">
+                      <KeyRound className="w-4 h-4 text-emerald-700" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter admin password"
+                      value={passwordInput}
+                      onChange={e => setPasswordInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.getModifierState && e.getModifierState('CapsLock')) {
+                          setCapsLockActive(true);
+                        } else {
+                          setCapsLockActive(false);
+                        }
+                      }}
+                      onKeyUp={e => {
+                        if (e.getModifierState && e.getModifierState('CapsLock')) {
+                          setCapsLockActive(true);
+                        } else {
+                          setCapsLockActive(false);
+                        }
+                      }}
+                      className="w-full pl-10 pr-20 py-2.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700/30 focus:border-emerald-700 transition-all font-mono min-h-[44px]"
+                    />
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {passwordInput && (
+                        <button
+                          type="button"
+                          onClick={() => setPasswordInput('')}
+                          className="p-1.5 text-stone-400 hover:text-stone-600 rounded-md cursor-pointer"
+                          title="Clear input"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setPasswordInput('')}
-                        className="p-1 text-stone-400 hover:text-stone-600 rounded-md cursor-pointer"
-                        title="Clear input"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="p-2 text-stone-400 hover:text-stone-700 rounded-md transition-colors cursor-pointer"
+                        title={showPassword ? 'Hide password' : 'Show password'}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="p-1.5 text-stone-400 hover:text-stone-700 rounded-md transition-colors cursor-pointer"
-                      title={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                    </div>
                   </div>
+
+                  {capsLockActive && (
+                    <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 mt-1.5 flex items-center gap-1 font-medium animate-pulse">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>Caps Lock is ON — passwords are case-sensitive.</span>
+                    </p>
+                  )}
                 </div>
 
-                {/* Caps Lock warning indicator */}
-                {capsLockActive && (
-                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1 mt-1.5 flex items-center gap-1 font-medium animate-pulse">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Caps Lock is ON — passwords are case-sensitive.</span>
-                  </p>
+                {authError && (
+                  <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl flex items-center gap-2 font-medium">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{authError}</span>
+                  </div>
                 )}
-              </div>
 
-              {authError && (
-                <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-3 py-2 rounded-xl flex items-center gap-2 font-medium">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{authError}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoggingIn}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-800 to-emerald-950 hover:from-emerald-900 hover:to-stone-950 text-white font-extrabold text-sm shadow-lg shadow-emerald-900/20 hover:shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
-              >
-                {isLoggingIn ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
-                    <span>Verifying Access...</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-4 h-4 text-amber-300" />
-                    <span>Login to Admin Console</span>
-                    <ArrowRight className="w-4 h-4 text-emerald-300" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Assistance link */}
-            <div className="pt-2 text-center text-xs text-stone-500 border-t border-stone-200/80">
-              <span>Need password help or forgot credentials? </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const url = createWhatsAppUrl(
-                    storeSettings.whatsappNumber,
-                    `Hello ${storeSettings.shopName}! I need assistance recovering the store admin password.`
-                  );
-                  window.open(url, '_blank', 'noopener,noreferrer');
-                }}
-                className="text-emerald-800 font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
-              >
-                <MessageCircle className="w-3 h-3 text-emerald-600" /> Contact Support
-              </button>
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-800 to-emerald-950 hover:from-emerald-900 hover:to-stone-950 text-white font-extrabold text-sm shadow-lg shadow-emerald-900/20 hover:shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50 min-h-[48px]"
+                >
+                  {isLoggingIn ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                      <span>Verifying Access...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 text-amber-300" />
+                      <span>Login to Admin Console</span>
+                      <ArrowRight className="w-4 h-4 text-emerald-300" />
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
           </div>
         ) : (
           /* Authenticated Dashboard */
-          <div className="flex-1 flex flex-col min-h-0">
-            {/* Executive KPI Ribbon */}
-            <div className="bg-[#FAF8F5] border-b border-stone-200/90 px-3 sm:px-4 py-2.5 grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5 shrink-0">
-              {/* Metric 1: Products */}
-              <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
-                  <Package className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Products</div>
-                  <div className="text-sm font-black text-stone-900 leading-tight">
-                    {products.length} Items
-                  </div>
-                  <div className="text-[10px] text-emerald-700 font-semibold truncate">
-                    {products.filter(p => p.inStock).length} in stock
-                  </div>
-                </div>
-              </div>
-
-              {/* Metric 2: Orders */}
-              <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-800 shrink-0">
-                  <ShoppingCart className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Orders</div>
-                  <div className="text-sm font-black text-stone-900 leading-tight">
-                    {orders.length} Orders
-                  </div>
-                  <div className="text-[10px] text-amber-700 font-semibold truncate">
-                    {orders.filter(o => o.status === 'Pending').length} pending action
-                  </div>
-                </div>
-              </div>
-
-              {/* Metric 3: Revenue */}
-              <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Gross Sales</div>
-                  <div className="text-sm font-black text-emerald-950 leading-tight">
-                    ₹{orders.filter(o => o.status !== 'Cancelled').reduce((acc, o) => acc + (o.totalAmount || 0), 0).toLocaleString('en-IN')}
-                  </div>
-                  <div className="text-[10px] text-stone-500 font-semibold truncate">
-                    Delivered & active
-                  </div>
-                </div>
-              </div>
-
-              {/* Metric 4: Reviews */}
-              <div className="bg-white p-2.5 rounded-xl border border-stone-200 shadow-2xs flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-800 shrink-0">
-                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Rating</div>
-                  <div className="text-sm font-black text-stone-900 leading-tight">
-                    {storeSettings.reviewsSection?.ratingText || '4.9 / 5.0'}
-                  </div>
-                  <div className="text-[10px] text-stone-500 font-semibold truncate">
-                    {(storeSettings.reviewsSection?.reviews?.length || 0)} ratings verified
-                  </div>
-                </div>
-              </div>
+          <div className="flex-1 flex min-h-0 overflow-hidden relative">
+            {/* Desktop Left Sidebar */}
+            <div className="hidden md:block h-full shrink-0">
+              <AdminSidebar
+                activeTab={activeTab}
+                onSelectTab={handleOpenStoreTab}
+                pendingOrdersCount={orders.filter(o => o.status === 'Pending').length}
+                pendingReviewsCount={(reviews || []).filter(r => r.status === 'pending').length}
+                activeCouponsCount={(storeSettings.coupons || []).filter(c => c.enabled).length}
+                productsCount={products.length}
+                adminEmail={adminUser?.email || 'maknutsmakhana@gmail.com'}
+                onLogout={async () => {
+                  await adminLogout();
+                }}
+                onClose={onClose}
+              />
             </div>
 
-            {/* Tabs Navigation */}
-            <div className="bg-white border-b border-stone-200 px-3 sm:px-4 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0 scroll-smooth">
-              <button
-                onClick={() => handleOpenStoreTab('products')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'products'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
+            {/* Mobile Drawer (Modal) */}
+            {isMobileSidebarOpen && (
+              <div 
+                className="md:hidden fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-xs flex"
+                onClick={() => setIsMobileSidebarOpen(false)}
               >
-                <Package className="w-3.5 h-3.5" />
-                <span>Products ({products.length})</span>
-              </button>
+                <div 
+                  className="w-72 h-full max-w-[85vw] animate-in slide-in-from-left duration-200"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <AdminSidebar
+                    activeTab={activeTab}
+                    onSelectTab={tab => {
+                      handleOpenStoreTab(tab);
+                      setIsMobileSidebarOpen(false);
+                    }}
+                    pendingOrdersCount={orders.filter(o => o.status === 'Pending').length}
+                    pendingReviewsCount={(reviews || []).filter(r => r.status === 'pending').length}
+                    activeCouponsCount={(storeSettings.coupons || []).filter(c => c.enabled).length}
+                    productsCount={products.length}
+                    adminEmail={adminUser?.email || 'maknutsmakhana@gmail.com'}
+                    onLogout={async () => {
+                      setIsMobileSidebarOpen(false);
+                      await adminLogout();
+                    }}
+                    onClose={() => setIsMobileSidebarOpen(false)}
+                    isMobileOpen={isMobileSidebarOpen}
+                    setIsMobileOpen={setIsMobileSidebarOpen}
+                  />
+                </div>
+              </div>
+            )}
 
-              <button
-                onClick={() => handleOpenStoreTab('store')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'store'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Store & UPI Settings</span>
-              </button>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#FAF8F5]">
+              {/* Top Sub-Header Bar */}
+              <div className="bg-white border-b border-stone-200/90 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileSidebarOpen(true)}
+                    className="md:hidden p-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 transition-colors cursor-pointer"
+                    title="Toggle Admin Menu"
+                  >
+                    <Menu className="w-4 h-4" />
+                  </button>
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-stone-400 tracking-wider">Store Control Center</div>
+                    <div className="text-sm font-serif font-black text-stone-900 capitalize">
+                      {activeTab === 'food_compliance' ? 'Food & FSSAI Compliance' : activeTab.replace('_', ' ')}
+                    </div>
+                  </div>
+                </div>
 
-              <button
-                onClick={() => handleOpenStoreTab('support')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'support'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <Headphones className="w-3.5 h-3.5" />
-                <span>Customer Support</span>
-              </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => downloadStoreExecutiveReportPdf(orders, products, storeSettings, storeSettings.coupons || [])}
+                    className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center gap-1.5 border border-amber-300 transition-colors cursor-pointer shadow-2xs"
+                    title="Download Complete Store Executive Audit Report PDF"
+                  >
+                    <Download className="w-3.5 h-3.5 text-amber-700" />
+                    <span className="hidden sm:inline">Store PDF Report</span>
+                  </button>
 
-              <button
-                onClick={() => handleOpenStoreTab('homepage')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'homepage'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Banner, Buttons & Footer</span>
-              </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold flex items-center gap-1.5 border border-emerald-200 transition-colors cursor-pointer"
+                    title="Preview public customer website"
+                  >
+                    <Store className="w-3.5 h-3.5 text-emerald-800" />
+                    <span className="hidden sm:inline">Preview Storefront</span>
+                  </button>
+                </div>
+              </div>
 
-              <button
-                onClick={() => handleOpenStoreTab('benefits')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'benefits'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <Leaf className="w-3.5 h-3.5" />
-                <span>Why Choose Us ({settingsForm.benefitsSection?.items?.length || 0})</span>
-              </button>
-
-              <button
-                onClick={() => handleOpenStoreTab('reviews')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'reviews'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <MessageSquareHeart className="w-3.5 h-3.5" />
-                <span>Reviews & Feedback ({(settingsForm.reviewsSection?.reviews?.length || 0)})</span>
-                {feedbacks.length > 0 && (
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              {/* Tab Content Container */}
+              <div className="flex-1 overflow-y-auto p-3 sm:p-6 pb-24 sm:pb-6 space-y-6">
+                {/* TAB: OVERVIEW */}
+                {activeTab === 'overview' && (
+                  <AdminOverviewTab
+                    orders={orders}
+                    products={products}
+                    storeSettings={storeSettings}
+                    reviews={reviews || []}
+                    onNavigateTab={handleOpenStoreTab}
+                    onOpenOrder={(order) => {
+                      handleOpenStoreTab('orders');
+                      setOrderSearchQuery(order.orderNumber);
+                    }}
+                  />
                 )}
-              </button>
 
-              <button
-                onClick={() => handleOpenStoreTab('gallery')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'gallery'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <Camera className="w-3.5 h-3.5" />
-                <span>Photo Gallery ({settingsForm.gallerySection?.photos?.length || 0})</span>
-              </button>
+                {/* TAB: STOREFRONT */}
+                {activeTab === 'storefront' && (
+                  <AdminStorefrontTab
+                    settings={storeSettings}
+                    onSaveSettings={async (updated) => {
+                      await updateSettings(updated);
+                    }}
+                    onPreviewStorefront={onClose}
+                  />
+                )}
 
-              <button
-                onClick={() => handleOpenStoreTab('orders')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'orders'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <ShoppingCart className="w-3.5 h-3.5" />
-                <span>Orders ({orders.length})</span>
-              </button>
+                {/* TAB: COUPONS */}
+                {activeTab === 'coupons' && (
+                  <AdminCouponsTab
+                    coupons={storeSettings.coupons || []}
+                    products={products}
+                    onSaveCoupons={async (updatedCoupons) => {
+                      await updateSettings({ coupons: updatedCoupons });
+                    }}
+                  />
+                )}
 
-              <button
-                onClick={() => handleOpenStoreTab('policies')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'policies'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Policies</span>
-              </button>
+                {/* TAB: FOOD & FSSAI COMPLIANCE */}
+                {activeTab === 'food_compliance' && (
+                  <AdminFoodComplianceTab
+                    settings={storeSettings}
+                    products={products}
+                    onSaveCompliance={async (updatedCompliance) => {
+                      await updateSettings({ foodCompliance: updatedCompliance });
+                    }}
+                  />
+                )}
 
-              <button
-                onClick={() => handleOpenStoreTab('backup')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
-                  activeTab === 'backup'
-                    ? 'bg-emerald-800 text-white shadow-xs'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Backup & Reset</span>
-              </button>
-            </div>
+                {/* TAB: PAYMENTS */}
+                {activeTab === 'payments' && (
+                  <AdminPaymentsTab
+                    orders={orders}
+                    onUpdatePaymentStatus={async (orderId, newStatus) => {
+                      await updatePaymentStatus(orderId, newStatus);
+                    }}
+                    onOpenOrder={(order) => {
+                      handleOpenStoreTab('orders');
+                      setOrderSearchQuery(order.orderNumber);
+                    }}
+                    whatsappNumber={storeSettings.whatsappNumber}
+                  />
+                )}
 
-            {/* Tab Content Container */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                {/* TAB: CUSTOMERS */}
+                {activeTab === 'customers' && (
+                  <AdminCustomersTab
+                    orders={orders}
+                    onOpenOrder={(order) => {
+                      handleOpenStoreTab('orders');
+                      setOrderSearchQuery(order.orderNumber);
+                    }}
+                  />
+                )}
+
+                {/* TAB: MEDIA MANAGER */}
+                {activeTab === 'media' && (
+                  <AdminMediaTab
+                    settings={storeSettings}
+                    products={products}
+                    onSaveSettings={async (updated) => {
+                      await updateSettings(updated);
+                    }}
+                    onAddGalleryPhoto={async (url, caption) => {
+                      await addGalleryPhoto({
+                        id: 'gal-' + Date.now(),
+                        url,
+                        caption,
+                        tag: 'Store Photo',
+                        createdAt: new Date().toISOString(),
+                      });
+                    }}
+                  />
+                )}
+
+                {/* TAB: WHATSAPP */}
+                {activeTab === 'whatsapp' && (
+                  <AdminWhatsAppTab
+                    settings={storeSettings}
+                    onSaveSettings={async (updated) => {
+                      await updateSettings(updated);
+                    }}
+                  />
+                )}
+
+                {/* TAB: SEO */}
+                {activeTab === 'seo' && (
+                  <AdminSeoTab
+                    settings={storeSettings}
+                    onSaveSettings={async (updated) => {
+                      await updateSettings(updated);
+                    }}
+                  />
+                )}
+
+                {/* TAB: REPORTS */}
+                {activeTab === 'reports' && (
+                  <AdminReportsTab
+                    orders={orders}
+                    products={products}
+                    coupons={storeSettings.coupons || []}
+                    reviews={reviews || []}
+                    storeSettings={storeSettings}
+                  />
+                )}
               
               {/* TAB 1: PRODUCTS */}
               {activeTab === 'products' && (
@@ -1450,8 +1860,539 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 </div>
               )}
 
+              {/* TAB: PRICING & ORDER CONTROLS */}
+              {activeTab === 'pricing' && (() => {
+                const previewPricing = calculateOrderPricing({
+                  productPrice: pricingForm.productPrice,
+                  originalPrice: pricingForm.originalPrice,
+                  quantity: previewTestQty,
+                  settings: {
+                    ...storeSettings,
+                    deliveryCharge: pricingForm.deliveryCharge,
+                    freeDeliveryThreshold: pricingForm.freeDeliveryThreshold,
+                    freeDeliveryAllOrders: pricingForm.freeDeliveryAllOrders,
+                    discountEnabled: pricingForm.discountEnabled,
+                    discountType: pricingForm.discountType,
+                    discountValue: pricingForm.discountValue,
+                    minOrderQuantity: pricingForm.minOrderQuantity,
+                    maxOrderQuantity: pricingForm.maxOrderQuantity,
+                    orderIdPrefix: pricingForm.orderIdPrefix,
+                  },
+                });
+
+                return (
+                  <div className="space-y-6">
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-stone-200">
+                      <div>
+                        <h3 className="text-base sm:text-lg font-bold text-stone-900 font-serif flex items-center gap-2">
+                          <BadgePercent className="w-5 h-5 text-emerald-800" />
+                          <span>Pricing & Order Settings</span>
+                        </h3>
+                        <p className="text-xs text-stone-500">
+                          Live store pricing, discount rules, delivery charges, and order limits saved to Firestore.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleSavePricing}
+                        disabled={isSavingPricing}
+                        className="px-5 py-2.5 bg-emerald-800 hover:bg-emerald-900 active:scale-98 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm cursor-pointer transition-all"
+                      >
+                        {isSavingPricing ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                            <span>Saving Changes...</span>
+                          </>
+                        ) : pricingSavedToast ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Settings Saved!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Save Pricing Settings</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Feedback Banners */}
+                    {pricingSavedToast && (
+                      <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 flex items-center gap-2 font-medium animate-in fade-in">
+                        <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <span>Pricing and order parameters updated and published successfully to Firestore!</span>
+                      </div>
+                    )}
+
+                    {pricingError && (
+                      <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-900 flex items-center gap-2 font-medium">
+                        <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                        <span>{pricingError}</span>
+                      </div>
+                    )}
+
+                    {/* Main Layout Grid: Settings Form (Col 1) & Live Preview (Col 2) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                      
+                      {/* Left: Interactive Controls */}
+                      <div className="lg:col-span-7 space-y-4">
+                        
+                        {/* 1. Product Selling & MRP Price */}
+                        <div className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                              <Tag className="w-3.5 h-3.5 text-emerald-700" />
+                              1. Product Pricing
+                            </span>
+                            <span className="text-[11px] text-stone-500 font-medium">
+                              Applies to: {activeProduct?.name || 'Primary Product'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                Selling Price (₹) *
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-xs text-stone-500 font-bold">₹</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  value={pricingForm.productPrice}
+                                  onChange={e => setPricingForm({ ...pricingForm, productPrice: Math.max(0, Number(e.target.value) || 0) })}
+                                  className="w-full pl-8 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-sm font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                                />
+                              </div>
+                              <span className="text-[10px] text-stone-500 mt-0.5 block">Customer payable unit price</span>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                MRP / Original Price (₹) *
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-xs text-stone-500 font-bold">₹</span>
+                                <input
+                                  type="number"
+                                  min={pricingForm.productPrice}
+                                  step={1}
+                                  value={pricingForm.originalPrice}
+                                  onChange={e => setPricingForm({ ...pricingForm, originalPrice: Math.max(0, Number(e.target.value) || 0) })}
+                                  className="w-full pl-8 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-sm font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                                />
+                              </div>
+                              <span className="text-[10px] text-stone-500 mt-0.5 block">Strikethrough reference MRP</span>
+                            </div>
+                          </div>
+
+                          {pricingForm.originalPrice > pricingForm.productPrice && (
+                            <div className="text-[11px] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center justify-between font-semibold">
+                              <span>Display Strikethrough Discount:</span>
+                              <span>
+                                {Math.round(((pricingForm.originalPrice - pricingForm.productPrice) / pricingForm.originalPrice) * 100)}% OFF MRP
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. Discount Controls */}
+                        <div className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                              <BadgePercent className="w-3.5 h-3.5 text-emerald-700" />
+                              2. Store Discount Rule
+                            </span>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <span className="text-xs font-bold text-stone-700">
+                                {pricingForm.discountEnabled ? 'Enabled' : 'Disabled'}
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={pricingForm.discountEnabled}
+                                onChange={e => setPricingForm({ ...pricingForm, discountEnabled: e.target.checked })}
+                                className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-700 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+
+                          {pricingForm.discountEnabled ? (
+                            <div className="space-y-3 animate-in fade-in">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                    Discount Calculation Type
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-100 rounded-xl border border-stone-200">
+                                    <button
+                                      type="button"
+                                      onClick={() => setPricingForm({ ...pricingForm, discountType: 'percentage' })}
+                                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        pricingForm.discountType === 'percentage'
+                                          ? 'bg-white text-emerald-950 shadow-xs'
+                                          : 'text-stone-600 hover:text-stone-900'
+                                      }`}
+                                    >
+                                      Percentage (%)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setPricingForm({ ...pricingForm, discountType: 'fixed' })}
+                                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        pricingForm.discountType === 'fixed'
+                                          ? 'bg-white text-emerald-950 shadow-xs'
+                                          : 'text-stone-600 hover:text-stone-900'
+                                      }`}
+                                    >
+                                      Fixed (₹)
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                    Discount Value ({pricingForm.discountType === 'percentage' ? '%' : '₹'}) *
+                                  </label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-xs text-stone-500 font-bold">
+                                      {pricingForm.discountType === 'percentage' ? '%' : '₹'}
+                                    </span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={pricingForm.discountType === 'percentage' ? 100 : pricingForm.productPrice}
+                                      step={pricingForm.discountType === 'percentage' ? 1 : 5}
+                                      value={pricingForm.discountValue}
+                                      onChange={e => {
+                                        const raw = Number(e.target.value) || 0;
+                                        const clamped = pricingForm.discountType === 'percentage'
+                                          ? Math.min(100, Math.max(0, raw))
+                                          : Math.max(0, raw);
+                                        setPricingForm({ ...pricingForm, discountValue: clamped });
+                                      }}
+                                      className="w-full pl-8 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-sm font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                                    />
+                                  </div>
+                                  <span className="text-[10px] text-stone-500 mt-0.5 block">
+                                    {pricingForm.discountType === 'percentage'
+                                      ? 'Allowed: 0% to 100% of base amount'
+                                      : `Max allowed: up to product price (₹${pricingForm.productPrice})`}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-stone-500 italic py-1">
+                              Discount is currently disabled. Customers will pay full product price without store promotion.
+                            </p>
+                          )}
+                        </div>
+
+                        {/* 3. Delivery Controls */}
+                        <div className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                              <Truck className="w-3.5 h-3.5 text-emerald-700" />
+                              3. Delivery Charge & Free Delivery Rule
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                Standard Delivery Charge (₹)
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-xs text-stone-500 font-bold">₹</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={5}
+                                  value={pricingForm.deliveryCharge}
+                                  onChange={e => setPricingForm({ ...pricingForm, deliveryCharge: Math.max(0, Number(e.target.value) || 0) })}
+                                  className="w-full pl-8 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-sm font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                                />
+                              </div>
+                              <span className="text-[10px] text-stone-500 mt-0.5 block">Applied when order below free limit</span>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                Free Delivery Threshold (₹)
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2.5 text-xs text-stone-500 font-bold">₹</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={50}
+                                  value={pricingForm.freeDeliveryThreshold}
+                                  onChange={e => setPricingForm({ ...pricingForm, freeDeliveryThreshold: Math.max(0, Number(e.target.value) || 0) })}
+                                  className="w-full pl-8 pr-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-sm font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                                />
+                              </div>
+                              <span className="text-[10px] text-stone-500 mt-0.5 block">Free delivery eligible when subtotal ≥ this</span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-bold text-stone-900 block">Offer Free Delivery On All Orders</span>
+                              <span className="text-[11px] text-stone-500">Bypasses threshold and sets ₹0 delivery for all orders</span>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(pricingForm.freeDeliveryAllOrders)}
+                              onChange={e => setPricingForm({ ...pricingForm, freeDeliveryAllOrders: e.target.checked })}
+                              className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-700 cursor-pointer"
+                            />
+                          </div>
+                        </div>
+
+                        {/* 4. Quantity Bounds & Order ID Prefix */}
+                        <div className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                              <ShoppingCart className="w-3.5 h-3.5 text-emerald-700" />
+                              4. Quantity Limits & Order ID Prefix
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                Minimum Order Qty *
+                              </label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={pricingForm.maxOrderQuantity}
+                                value={pricingForm.minOrderQuantity}
+                                onChange={e => {
+                                  const val = Math.max(1, Math.floor(Number(e.target.value) || 1));
+                                  setPricingForm({ ...pricingForm, minOrderQuantity: val });
+                                }}
+                                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-sm font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                              />
+                              <span className="text-[10px] text-stone-500 mt-0.5 block">Min customer can pick (min 1)</span>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                Maximum Order Qty *
+                              </label>
+                              <input
+                                type="number"
+                                min={pricingForm.minOrderQuantity}
+                                max={100}
+                                value={pricingForm.maxOrderQuantity}
+                                onChange={e => {
+                                  const val = Math.max(pricingForm.minOrderQuantity, Math.floor(Number(e.target.value) || 20));
+                                  setPricingForm({ ...pricingForm, maxOrderQuantity: val });
+                                }}
+                                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-sm font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                              />
+                              <span className="text-[10px] text-stone-500 mt-0.5 block">Max customer can pick</span>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                                Order ID Prefix *
+                              </label>
+                              <input
+                                type="text"
+                                maxLength={6}
+                                value={pricingForm.orderIdPrefix}
+                                onChange={e => {
+                                  const clean = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                                  setPricingForm({ ...pricingForm, orderIdPrefix: clean });
+                                }}
+                                placeholder="MK"
+                                className="w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-sm font-bold text-stone-900 font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                              />
+                              <span className="text-[10px] text-stone-500 mt-0.5 block font-mono">
+                                e.g. {pricingForm.orderIdPrefix || 'MK'}-261009-A7F3
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 5. Payment Options Enabled */}
+                        <div className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                              <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
+                              5. Accepted Payment Methods
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <label className="p-3 rounded-xl border border-stone-200 bg-stone-50/70 flex items-center justify-between cursor-pointer hover:bg-stone-100 transition-all">
+                              <div>
+                                <span className="text-xs font-bold text-stone-900 block">UPI QR / Direct UPI</span>
+                                <span className="text-[11px] text-stone-500">Google Pay, PhonePe, Paytm QR</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={pricingForm.enableUpi}
+                                onChange={e => setPricingForm({ ...pricingForm, enableUpi: e.target.checked })}
+                                className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-700 cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="p-3 rounded-xl border border-stone-200 bg-stone-50/70 flex items-center justify-between cursor-pointer hover:bg-stone-100 transition-all">
+                              <div>
+                                <span className="text-xs font-bold text-stone-900 block">Cash On Delivery (COD)</span>
+                                <span className="text-[11px] text-stone-500">Cash collection on delivery</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={pricingForm.enableCod}
+                                onChange={e => setPricingForm({ ...pricingForm, enableCod: e.target.checked })}
+                                className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-700 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* Right: Live Admin Preview Card (Requirement: Product Price − Discount + Delivery = Customer Pays) */}
+                      <div className="lg:col-span-5 sticky top-3 space-y-4">
+                        <div className="bg-gradient-to-br from-emerald-950 via-emerald-900 to-stone-950 text-white p-5 rounded-3xl shadow-xl border border-emerald-800/40 space-y-4">
+                          
+                          <div className="flex items-center justify-between border-b border-emerald-800/60 pb-3">
+                            <div>
+                              <span className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                                <Calculator className="w-4 h-4 text-amber-300" />
+                                Live Admin Preview
+                              </span>
+                              <span className="text-[11px] text-emerald-200/80 block mt-0.5">
+                                Live checkout math for customer cart
+                              </span>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-800 text-emerald-200 border border-emerald-700">
+                              Formula Verified
+                            </span>
+                          </div>
+
+                          {/* Quick Quantity Test Switcher */}
+                          <div>
+                            <span className="text-[11px] font-semibold text-emerald-200 block mb-1.5">
+                              Test Customer Quantity:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {[1, 2, 3, 5, 10].map(qty => (
+                                <button
+                                  key={qty}
+                                  type="button"
+                                  onClick={() => setPreviewTestQty(qty)}
+                                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    previewTestQty === qty
+                                      ? 'bg-amber-400 text-emerald-950 shadow-md font-black'
+                                      : 'bg-emerald-800/80 text-emerald-100 hover:bg-emerald-700/80 border border-emerald-700/60'
+                                  }`}
+                                >
+                                  {qty} {qty === 1 ? 'Unit' : 'Units'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* The Exact Calculation Breakdown Box */}
+                          <div className="bg-emerald-900/60 border border-emerald-700/60 rounded-2xl p-4 space-y-2.5 font-mono text-xs">
+                            
+                            {/* Product Selling Price x Qty */}
+                            <div className="flex justify-between items-center text-emerald-100">
+                              <span className="font-sans">Product Price ({previewTestQty} × ₹{pricingForm.productPrice}):</span>
+                              <span className="font-bold text-white text-sm">₹{previewPricing.baseAmount.toFixed(2)}</span>
+                            </div>
+
+                            {/* Discount */}
+                            <div className="flex justify-between items-center text-amber-300">
+                              <span className="font-sans flex items-center gap-1">
+                                <span>− Store Discount</span>
+                                {pricingForm.discountEnabled && pricingForm.discountValue > 0 && (
+                                  <span className="text-[10px] bg-amber-400/20 px-1 rounded text-amber-200">
+                                    {pricingForm.discountType === 'percentage' ? `${pricingForm.discountValue}% OFF` : 'Fixed'}
+                                  </span>
+                                )}
+                                :
+                              </span>
+                              <span className="font-bold">−₹{previewPricing.discountAmount.toFixed(2)}</span>
+                            </div>
+
+                            {/* Subtotal line */}
+                            <div className="flex justify-between items-center text-emerald-200/90 pt-1 border-t border-emerald-800/60">
+                              <span className="font-sans">Subtotal (Base − Discount):</span>
+                              <span className="font-bold">₹{previewPricing.subtotal.toFixed(2)}</span>
+                            </div>
+
+                            {/* Delivery Charge */}
+                            <div className="flex justify-between items-center text-emerald-100">
+                              <span className="font-sans flex items-center gap-1">
+                                <span>+ Delivery Charge:</span>
+                                {previewPricing.isFreeDelivery && (
+                                  <span className="text-[10px] bg-emerald-700 text-emerald-100 px-1 rounded">
+                                    Eligible Free
+                                  </span>
+                                )}
+                              </span>
+                              <span className={`font-bold ${previewPricing.isFreeDelivery ? 'text-emerald-300' : 'text-white'}`}>
+                                {previewPricing.isFreeDelivery ? '₹0.00 (FREE)' : `+₹${previewPricing.deliveryCharge.toFixed(2)}`}
+                              </span>
+                            </div>
+
+                            {/* Final Total */}
+                            <div className="pt-2.5 border-t-2 border-amber-400/60 flex justify-between items-baseline font-sans">
+                              <div>
+                                <span className="text-xs font-bold uppercase tracking-wider text-amber-300 block">
+                                  = Customer Pays
+                                </span>
+                                <span className="text-[10px] text-emerald-300">
+                                  Final Payable Amount
+                                </span>
+                              </div>
+                              <span className="text-2xl font-black text-amber-300 font-serif">
+                                ₹{previewPricing.finalTotal.toFixed(2)}
+                              </span>
+                            </div>
+
+                            {/* Customer savings readout */}
+                            {previewPricing.totalSavings > 0 && (
+                              <div className="mt-2 pt-2 border-t border-emerald-800/80 font-sans text-[11px] text-emerald-200 flex items-center justify-between">
+                                <span className="flex items-center gap-1">
+                                  <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Total Savings:
+                                </span>
+                                <span className="font-bold text-amber-300 font-mono">
+                                  ₹{previewPricing.totalSavings.toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Live Guidance Note */}
+                          <div className="text-[11px] text-emerald-200/80 space-y-1 bg-emerald-950/80 p-3 rounded-xl border border-emerald-800/60 leading-relaxed">
+                            <p className="font-bold text-amber-300">⚙️ How Calculations Work:</p>
+                            <p>• <strong>Base Amount:</strong> Product Price × Quantity.</p>
+                            <p>• <strong>Discount:</strong> Applied to base amount; never makes total negative.</p>
+                            <p>• <strong>Delivery:</strong> Free when subtotal reaches ₹{pricingForm.freeDeliveryThreshold} (otherwise ₹{pricingForm.deliveryCharge}).</p>
+                            <p>• <strong>Order ID:</strong> Generated as {pricingForm.orderIdPrefix || 'MK'}-YYMMDD-HEX4 with zero collision.</p>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* TAB 2: STORE & UPI SETTINGS */}
-              {activeTab === 'store' && (
+              {(activeTab === 'store' || activeTab === 'settings') && (
                 <div className="space-y-5">
                   <div className="flex items-center justify-between pb-2 border-b border-stone-200">
                     <div>
@@ -1630,30 +2571,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold text-stone-700 mb-1">
-                          Admin Password (Masked for Security)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={showSettingsPassword ? 'text' : 'password'}
-                            value={settingsForm.adminPassword}
-                            onChange={e => setSettingsForm({ ...settingsForm, adminPassword: e.target.value })}
-                            className="w-full px-3 py-2 pr-10 rounded-xl border border-stone-300 text-xs font-mono"
-                            placeholder="Enter new password"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowSettingsPassword(!showSettingsPassword)}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 p-1"
-                            title={showSettingsPassword ? 'Hide password' : 'Show password'}
-                          >
-                            {showSettingsPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
+                      <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-start gap-2.5">
+                        <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold text-emerald-900">Firebase Authentication Protected</p>
+                          <p className="text-[11px] text-emerald-800/80 mt-0.5">
+                            Admin credentials and active sessions are encrypted and authenticated directly via Firebase Auth. Master passwords are never exposed or stored in public documents.
+                          </p>
                         </div>
-                        <p className="text-[10px] text-stone-400 mt-1">
-                          Used to log in to this management dashboard.
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -1728,7 +2653,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               type="email"
                               value={settingsForm.supportEmail || ''}
                               onChange={e => setSettingsForm({ ...settingsForm, supportEmail: e.target.value })}
-                              placeholder="maknutsmakhana@gmail.com"
+                              placeholder="Enter support email address"
                               className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs focus:ring-2 focus:ring-emerald-700/30 focus:outline-none"
                             />
                             <p className="text-[11px] text-stone-400 mt-1">
@@ -2363,95 +3288,176 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
               )}
 
               {/* TAB 5: UNIFIED CUSTOMER REVIEWS & FEEDBACK */}
-              {activeTab === 'reviews' && (
-                <div className="space-y-5">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-stone-200">
-                    <div>
-                      <h3 className="text-base font-bold text-stone-900 font-serif flex items-center gap-2">
-                        <MessageSquareHeart className="w-4 h-4 text-emerald-800" />
-                        <span>Customer Reviews & Feedback</span>
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                          {(settingsForm.reviewsSection?.reviews || []).length} Total
-                        </span>
-                      </h3>
-                      <p className="text-xs text-stone-500 mt-0.5">
-                        Merged review & feedback hub. Edit reviews, approve ratings, reply on WhatsApp, and manage homepage testimonials.
-                      </p>
+              {activeTab === 'reviews' && (() => {
+                const allReviewsList = reviews || [];
+                const pendingCount = allReviewsList.filter(r => r.status === 'pending').length;
+                const approvedCount = allReviewsList.filter(r => (r.status || 'approved') === 'approved').length;
+                const rejectedCount = allReviewsList.filter(r => r.status === 'rejected').length;
+
+                const approvedList = allReviewsList.filter(r => (r.status || 'approved') === 'approved');
+                const approvedStats = calculateReviewStats(approvedList);
+
+                const filteredReviews = allReviewsList.filter(r => {
+                  const s = r.status || 'approved';
+                  if (reviewFilter === 'pending' && s !== 'pending') return false;
+                  if (reviewFilter === 'approved' && s !== 'approved') return false;
+                  if (reviewFilter === 'rejected' && s !== 'rejected') return false;
+
+                  if (reviewSearch.trim()) {
+                    const q = reviewSearch.trim().toLowerCase();
+                    const matchName = (r.name || '').toLowerCase().includes(q);
+                    const matchComment = (r.comment || '').toLowerCase().includes(q);
+                    const matchOriginal = (r.originalComment || '').toLowerCase().includes(q);
+                    const matchOrder = (r.orderId || '').toLowerCase().includes(q);
+                    const matchPhone = (r.phone || '').includes(q);
+                    const matchLocation = (r.location || '').toLowerCase().includes(q);
+                    const matchReply = (r.storeReply || '').toLowerCase().includes(q);
+                    if (!matchName && !matchComment && !matchOriginal && !matchOrder && !matchPhone && !matchLocation && !matchReply) {
+                      return false;
+                    }
+                  }
+                  return true;
+                }).sort((a, b) => {
+                  if (reviewSort === 'newest') {
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                  }
+                  if (reviewSort === 'oldest') {
+                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                  }
+                  if (reviewSort === 'highest') {
+                    return (Number(b.rating) || 5) - (Number(a.rating) || 5);
+                  }
+                  if (reviewSort === 'lowest') {
+                    return (Number(a.rating) || 5) - (Number(b.rating) || 5);
+                  }
+                  return 0;
+                });
+
+                return (
+                  <div className="space-y-5">
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-stone-200">
+                      <div>
+                        <h3 className="text-base font-bold text-stone-900 font-serif flex items-center gap-2">
+                          <MessageSquareHeart className="w-4 h-4 text-emerald-800" />
+                          <span>Customer Reviews & Feedback Moderation</span>
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                            {allReviewsList.length} Total
+                          </span>
+                          {pendingCount > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                              {pendingCount} Pending Review
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-xs text-stone-500 mt-0.5">
+                          Moderate customer reviews. Approve to publish, reject/hide, delete spam, verify genuine buyers, and reply publicly.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveSettings}
+                          className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          {settingsSavedToast ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-amber-300" />
+                              <span>Settings Saved!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-3.5 h-3.5" />
+                              <span>Save Section Settings</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSaveSettings}
-                        className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-                      >
-                        {settingsSavedToast ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-amber-300" />
-                            <span>Saved!</span>
-                          </>
+                    {/* Toast Notification */}
+                    {reviewToast && (
+                      <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in ${
+                        reviewToast.type === 'success' 
+                          ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                          : reviewToast.type === 'danger'
+                          ? 'bg-rose-50 border border-rose-200 text-rose-800'
+                          : 'bg-amber-50 border border-amber-200 text-amber-800'
+                      }`}>
+                        {reviewToast.type === 'success' ? (
+                          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : reviewToast.type === 'danger' ? (
+                          <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
                         ) : (
-                          <>
-                            <Save className="w-3.5 h-3.5" />
-                            <span>Save Changes</span>
-                          </>
+                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                         )}
-                      </button>
-                    </div>
-                  </div>
+                        <span>{reviewToast.message}</span>
+                      </div>
+                    )}
 
-                  {/* Toast Alert for deletion */}
-                  {reviewDeleteToast && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-800 flex items-center gap-2 animate-in fade-in">
-                      <Check className="w-4 h-4 text-rose-600" />
-                      <span>Review & feedback deleted successfully!</span>
-                    </div>
-                  )}
+                    {/* Executive Metric Cards - Requirement 9: Calculated strictly from APPROVED reviews only */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+                        <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Total Submissions</div>
+                        <div className="text-xl font-extrabold text-stone-900 mt-0.5">
+                          {allReviewsList.length}
+                        </div>
+                        <div className="text-[10px] text-stone-400 mt-0.5">
+                          {pendingCount} pending · {approvedCount} live
+                        </div>
+                      </div>
 
-                  {/* Summary Metric Cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
-                      <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Total Items</div>
-                      <div className="text-xl font-extrabold text-stone-900 mt-0.5">
-                        {(settingsForm.reviewsSection?.reviews || []).length}
+                      <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+                        <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Approved Rating</div>
+                        <div className="text-xl font-extrabold text-amber-500 mt-0.5 flex items-center gap-1">
+                          <span>★</span>
+                          <span>
+                            {approvedStats.hasReviews ? approvedStats.averageRating.toFixed(1) : '—'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-stone-400 mt-0.5">
+                          {approvedStats.hasReviews ? `from ${approvedCount} approved reviews` : 'No reviews yet'}
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+                        <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Star Breakdown</div>
+                        <div className="text-xs font-bold text-stone-800 mt-1 space-y-0.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-amber-500">5★ / 4★</span>
+                            <span className="text-stone-900 font-extrabold">{approvedStats.starCounts[5]} / {approvedStats.starCounts[4]}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-stone-400">3★ / 2★ / 1★</span>
+                            <span className="text-stone-700">{approvedStats.starCounts[3]} / {approvedStats.starCounts[2]} / {approvedStats.starCounts[1]}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
+                        <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Verified Buyers</div>
+                        <div className="text-xl font-extrabold text-emerald-800 mt-0.5 flex items-center gap-1">
+                          <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                          <span>{allReviewsList.filter(r => r.verifiedBuyer).length}</span>
+                        </div>
+                        <div className="text-[10px] text-stone-400 mt-0.5">
+                          Delivered order matches
+                        </div>
                       </div>
                     </div>
 
-                    <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
-                      <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Average Rating</div>
-                      <div className="text-xl font-extrabold text-amber-500 mt-0.5 flex items-center gap-1">
-                        <span>★</span>
-                        <span>
-                          {(settingsForm.reviewsSection?.reviews || []).length > 0
-                            ? (((settingsForm.reviewsSection?.reviews || []).reduce((acc, r) => acc + (r.rating || 5), 0)) / (settingsForm.reviewsSection?.reviews || []).length).toFixed(1)
-                            : '5.0'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
-                      <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">5-Star Reviews</div>
-                      <div className="text-xl font-extrabold text-emerald-800 mt-0.5">
-                        {(settingsForm.reviewsSection?.reviews || []).filter(r => (r.rating || 5) === 5).length}
-                      </div>
-                    </div>
-
-                    <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
-                      <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Guarantee Badge</div>
-                      <div className="text-xs font-bold text-emerald-900 truncate mt-1">
-                        {settingsForm.reviewsSection?.guaranteeBadge || '100% Satisfaction'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Reviews Section Header Settings */}
+                    {/* Section Titles Settings */}
                     <div className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3">
-                      <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
-                        Home Page Section Titles & Badges
-                      </h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                          <Settings className="w-3.5 h-3.5 text-emerald-800" />
+                          <span>Public Website Reviews Section Settings</span>
+                        </h4>
+                        <span className="text-[11px] text-stone-400">Homepage Display</span>
+                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-stone-700 mb-1">
                             Main Heading Title
@@ -2466,7 +3472,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 title: e.target.value
                               }
                             })}
-                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-300 text-xs focus:bg-white focus:outline-none"
                             placeholder="e.g. Customer Reviews & Feedback"
                           />
                         </div>
@@ -2485,33 +3491,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 subtitle: e.target.value
                               }
                             })}
-                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
+                            className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-300 text-xs focus:bg-white focus:outline-none"
                             placeholder="e.g. Real feedback from customers across India who snack on Maknuts..."
                           />
                         </div>
 
                         <div>
                           <label className="block text-xs font-semibold text-stone-700 mb-1">
-                            Average Star Rating Badge
-                          </label>
-                          <input
-                            type="text"
-                            value={settingsForm.reviewsSection?.ratingText || ''}
-                            onChange={e => setSettingsForm({
-                              ...settingsForm,
-                              reviewsSection: {
-                                ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                ratingText: e.target.value
-                              }
-                            })}
-                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
-                            placeholder="e.g. 4.9 / 5.0"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-stone-700 mb-1">
-                            Satisfaction Guarantee Badge Text
+                            Guarantee Badge Text
                           </label>
                           <input
                             type="text"
@@ -2523,232 +3510,505 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 guaranteeBadge: e.target.value
                               }
                             })}
-                            className="w-full px-3 py-2 rounded-xl border border-stone-300 text-xs"
-                            placeholder="e.g. 100% Satisfaction or Easy Replacement"
+                            className="w-full px-3 py-2 bg-stone-50 rounded-xl border border-stone-300 text-xs focus:bg-white focus:outline-none"
+                            placeholder="e.g. 100% Quality Guaranteed"
                           />
                         </div>
                       </div>
+
+                      {/* Requirement 9: Automatic calculation notice, no hardcoded rating */}
+                      <div className="p-2.5 bg-[#FAF8F5] rounded-xl border border-stone-200/80 flex items-center justify-between text-xs">
+                        <span className="text-stone-600 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Average Rating on Website:</span>
+                          <span className="font-bold text-emerald-950">
+                            {approvedStats.hasReviews ? `${approvedStats.averageRating.toFixed(1)} / 5.0 (${approvedCount} approved)` : 'No reviews yet.'}
+                          </span>
+                        </span>
+                        <span className="text-[11px] text-stone-400 italic">
+                          Calculated automatically from approved reviews only
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Unified Reviews & Feedback List */}
+                    {/* Moderation Hub: Search, Filters & Sorting (Requirement 3) */}
                     <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 space-y-4">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                        <div>
-                          <h4 className="font-bold text-xs uppercase tracking-wider text-emerald-950">
-                            All Customer Reviews & Feedbacks ({(settingsForm.reviewsSection?.reviews || []).length})
-                          </h4>
-                          <p className="text-[11px] text-stone-500">
-                            Submissions made through website forms or created here are synchronized across home page and database.
-                          </p>
+                      {/* Filter Tabs, Search & Sort Bar */}
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-stone-200">
+                        {/* Status Filter Tabs (Requirement 3) */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                          <button
+                            type="button"
+                            onClick={() => setReviewFilter('all')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                              reviewFilter === 'all'
+                                ? 'bg-emerald-900 text-white shadow-xs'
+                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            }`}
+                          >
+                            All ({allReviewsList.length})
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setReviewFilter('pending')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                              reviewFilter === 'pending'
+                                ? 'bg-amber-500 text-white shadow-xs'
+                                : pendingCount > 0
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold'
+                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            }`}
+                          >
+                            <span>⏳ Pending</span>
+                            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/40">
+                              {pendingCount}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setReviewFilter('approved')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                              reviewFilter === 'approved'
+                                ? 'bg-emerald-800 text-white shadow-xs'
+                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            }`}
+                          >
+                            <span>✓ Approved</span>
+                            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-stone-200/60">
+                              {approvedCount}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setReviewFilter('rejected')}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                              reviewFilter === 'rejected'
+                                ? 'bg-rose-800 text-white shadow-xs'
+                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            }`}
+                          >
+                            <span>✕ Rejected</span>
+                            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-stone-200/60">
+                              {rejectedCount}
+                            </span>
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const current = settingsForm.reviewsSection?.reviews || [];
-                            const newReview = {
-                              id: 'rev-' + Date.now(),
-                              name: 'Customer Name',
-                              location: 'Bangalore',
-                              rating: 5,
-                              comment: 'Super crisp, pure makhana with authentic taste!',
-                              createdAt: new Date().toISOString()
-                            };
-                            setSettingsForm({
-                              ...settingsForm,
-                              reviewsSection: {
-                                ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                reviews: [newReview, ...current]
-                              }
-                            });
-                          }}
-                          className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Add Review & Feedback</span>
-                        </button>
+
+                        {/* Search & Sort Controls (Requirement 3) */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                          {/* Search Input */}
+                          <div className="relative flex-1 sm:w-64">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                            <input
+                              type="text"
+                              value={reviewSearch}
+                              onChange={e => setReviewSearch(e.target.value)}
+                              placeholder="Search name, text, order, phone..."
+                              className="w-full pl-8 pr-7 py-1.5 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:bg-white focus:outline-none"
+                            />
+                            {reviewSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setReviewSearch('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Sort Dropdown */}
+                          <div className="relative">
+                            <select
+                              value={reviewSort}
+                              onChange={e => setReviewSort(e.target.value as any)}
+                              className="w-full sm:w-auto px-3 py-1.5 bg-stone-50 border border-stone-300 rounded-xl text-xs font-semibold text-stone-700 cursor-pointer focus:bg-white focus:outline-none"
+                            >
+                              <option value="newest">Sort: Newest First</option>
+                              <option value="oldest">Sort: Oldest First</option>
+                              <option value="highest">Sort: Highest Rating (5★ → 1★)</option>
+                              <option value="lowest">Sort: Lowest Rating (1★ → 5★)</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
 
-                      {(settingsForm.reviewsSection?.reviews || []).length === 0 ? (
-                        <div className="text-center py-8 text-stone-400">
-                          <MessageSquareHeart className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-xs">No reviews or feedbacks yet. Add one above or let customers submit online!</p>
+                      {/* Reviews List */}
+                      {filteredReviews.length === 0 ? (
+                        <div className="text-center py-12 text-stone-400">
+                          <MessageSquareHeart className="w-10 h-10 mx-auto mb-2 opacity-40 text-emerald-800" />
+                          <p className="text-sm font-semibold text-stone-600">No reviews match your filter</p>
+                          <p className="text-xs text-stone-400 mt-0.5">
+                            {reviewSearch ? 'Try a different search keyword or clear filters.' : 'No customer reviews submitted in this category.'}
+                          </p>
                         </div>
                       ) : (
-                        <div className="space-y-3.5 pt-1">
-                          {(settingsForm.reviewsSection?.reviews || []).map((review, idx) => (
-                            <div key={review.id || idx} className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3 shadow-2xs">
-                              {/* Item Header */}
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-stone-200/70">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="text-xs font-bold text-emerald-950">
-                                    #{idx + 1}
-                                  </span>
-                                  {review.createdAt && (
-                                    <span className="text-[10px] text-stone-400">
-                                      {new Date(review.createdAt).toLocaleDateString('en-IN', {
-                                        day: 'numeric',
-                                        month: 'short',
-                                        year: 'numeric'
-                                      })}
-                                    </span>
-                                  )}
-                                </div>
+                        <div className="space-y-4 pt-1">
+                          {filteredReviews.map((review, idx) => {
+                            const isPending = review.status === 'pending';
+                            const isApproved = (review.status || 'approved') === 'approved';
+                            const isRejected = review.status === 'rejected';
 
-                                <div className="flex items-center gap-2">
-                                  {/* Direct WhatsApp reply if phone exists */}
-                                  {review.phone && (
+                            // Requirement 7: Verified buyer matching against loaded orders
+                            const cleanPhone = review.phone ? review.phone.replace(/\D/g, '').slice(-10) : '';
+                            const cleanOrder = review.orderId ? review.orderId.trim().toLowerCase() : '';
+                            const matchedOrder = orders.find(o => 
+                              cleanOrder && (o.orderNumber.trim().toLowerCase() === cleanOrder || o.id === review.orderId?.trim()) &&
+                              cleanPhone && o.phone.replace(/\D/g, '').slice(-10) === cleanPhone
+                            );
+                            const orderIsDelivered = matchedOrder && (matchedOrder.status === 'Delivered' || (matchedOrder.status as string) === 'Completed');
+
+                            return (
+                              <div 
+                                key={review.id || idx} 
+                                className={`p-4 rounded-2xl border transition-all space-y-3.5 shadow-2xs ${
+                                  isPending 
+                                    ? 'bg-amber-50/40 border-amber-300/80 ring-1 ring-amber-300/30' 
+                                    : isApproved 
+                                    ? 'bg-stone-50/80 border-stone-200' 
+                                    : 'bg-rose-50/30 border-rose-200 opacity-80'
+                                }`}
+                              >
+                                {/* Item Header */}
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-stone-200/80">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {/* Status Badge */}
+                                    {isPending && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 animate-pulse">
+                                        <span>⏳ Pending Moderation</span>
+                                      </span>
+                                    )}
+                                    {isApproved && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-200 flex items-center gap-1">
+                                        <Check className="w-3 h-3 text-emerald-700" />
+                                        <span>Live on Website</span>
+                                      </span>
+                                    )}
+                                    {isRejected && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
+                                        <EyeOff className="w-3 h-3 text-rose-600" />
+                                        <span>Rejected / Hidden</span>
+                                      </span>
+                                    )}
+
+                                    {/* Star Rating Badge */}
+                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-amber-50 text-amber-600 border border-amber-200 flex items-center gap-1">
+                                      <span>{'★'.repeat(review.rating || 5)}</span>
+                                      <span className="text-stone-700 font-bold">({review.rating || 5}/5)</span>
+                                    </span>
+
+                                    {/* Date */}
+                                    {review.createdAt && (
+                                      <span className="text-[10px] text-stone-400">
+                                        {new Date(review.createdAt).toLocaleDateString('en-IN', {
+                                          day: 'numeric',
+                                          month: 'short',
+                                          year: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Top Actions: WhatsApp, Delete */}
+                                  <div className="flex items-center gap-2">
+                                    {review.phone && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const text = `Hello ${review.name}! Thank you for your ${review.rating}-star review on ${storeSettings.shopName}. We appreciate your support!`;
+                                          const url = createWhatsAppUrl(review.phone!, text);
+                                          window.open(url, '_blank', 'noopener,noreferrer');
+                                        }}
+                                        className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                        title="Send message to customer on WhatsApp"
+                                      >
+                                        <MessageCircle className="w-3 h-3" />
+                                        <span>WhatsApp</span>
+                                      </button>
+                                    )}
+
+                                    {/* Delete Spam Review (Requirement 3) */}
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        const text = `Hello ${review.name}! Thank you for your ${review.rating}-star review and feedback on ${storeSettings.shopName}. We appreciate your support!`;
-                                        const url = createWhatsAppUrl(review.phone!, text);
-                                        window.open(url, '_blank', 'noopener,noreferrer');
-                                      }}
-                                      className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      onClick={() => handleDeleteSpamReview(review.id)}
+                                      className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                      title="Permanently delete spam review"
                                     >
-                                      <MessageCircle className="w-3 h-3" />
-                                      <span>WhatsApp</span>
+                                      <Trash2 className="w-3 h-3" />
+                                      <span>Delete Spam</span>
                                     </button>
+                                  </div>
+                                </div>
+
+                                {/* Customer Info & Verified Buyer Inspection (Requirement 7) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                  <div className="bg-white p-2 rounded-xl border border-stone-200">
+                                    <span className="text-[10px] font-bold uppercase text-stone-400 block">Customer Name</span>
+                                    <span className="font-bold text-stone-900">{review.name}</span>
+                                    {review.location && <span className="text-stone-500 text-[11px]"> ({review.location})</span>}
+                                  </div>
+
+                                  <div className="bg-white p-2 rounded-xl border border-stone-200">
+                                    <span className="text-[10px] font-bold uppercase text-stone-400 block">Contact Phone</span>
+                                    <span className="font-mono text-stone-800">{review.phone || 'Not provided'}</span>
+                                  </div>
+
+                                  <div className="bg-white p-2 rounded-xl border border-stone-200">
+                                    <span className="text-[10px] font-bold uppercase text-stone-400 block">Order ID Provided</span>
+                                    <span className="font-mono text-stone-800">{review.orderId || 'None'}</span>
+                                  </div>
+
+                                  <div className="bg-white p-2 rounded-xl border border-stone-200">
+                                    <span className="text-[10px] font-bold uppercase text-stone-400 block">Verified Buyer Status</span>
+                                    {review.verifiedBuyer ? (
+                                      <span className="inline-flex items-center gap-1 text-emerald-800 font-bold text-[11px]">
+                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Verified Buyer ✓</span>
+                                      </span>
+                                    ) : orderIsDelivered ? (
+                                      <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]" title="Order matches and is Delivered">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Delivered (Eligible)</span>
+                                      </span>
+                                    ) : matchedOrder ? (
+                                      <span className="text-amber-700 font-semibold text-[11px]">
+                                        Order Status: {matchedOrder.status}
+                                      </span>
+                                    ) : review.orderId ? (
+                                      <span className="text-stone-500 text-[11px]">
+                                        Unmatched Order
+                                      </span>
+                                    ) : (
+                                      <span className="text-stone-400 text-[11px]">
+                                        No order attached
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Review Comment & Edit Area (Requirement 11) */}
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-[11px] font-bold text-stone-700 flex items-center gap-1.5">
+                                      <span>Customer Review Text</span>
+                                      {review.adminEditedAt && (
+                                        <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.2 rounded-md border border-amber-200">
+                                          Edited by Admin on {new Date(review.adminEditedAt).toLocaleDateString()}
+                                        </span>
+                                      )}
+                                    </label>
+
+                                    {editingReviewId !== review.id && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingReviewId(review.id);
+                                          setEditingReviewText(review.comment);
+                                        }}
+                                        className="text-[11px] font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Edit3 className="w-3 h-3" />
+                                        <span>Edit Text</span>
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {editingReviewId === review.id ? (
+                                    <div className="space-y-2 p-3 bg-white rounded-xl border border-emerald-300">
+                                      <textarea
+                                        rows={3}
+                                        value={editingReviewText}
+                                        onChange={e => setEditingReviewText(e.target.value)}
+                                        className="w-full p-2 bg-stone-50 rounded-lg border border-stone-300 text-xs focus:bg-white focus:outline-none"
+                                        placeholder="Edit review text..."
+                                      />
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingReviewId(null);
+                                            setEditingReviewText('');
+                                          }}
+                                          className="px-3 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSaveEditedReviewText(review.id)}
+                                          className="px-3 py-1 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold cursor-pointer"
+                                        >
+                                          Save & Preserve Original
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="p-3 bg-white rounded-xl border border-stone-200 text-xs text-stone-800 italic">
+                                      "{review.comment}"
+                                    </div>
                                   )}
 
-                                  {/* Delete Review Button - Direct and Reliable (No blocking confirm) */}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteReview(review.id, idx)}
-                                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                                    title="Delete this review & feedback"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    <span>Delete</span>
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Form inputs */}
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                                <div>
-                                  <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
-                                    Customer Name
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={review.name}
-                                    onChange={e => {
-                                      const updated = [...(settingsForm.reviewsSection?.reviews || [])];
-                                      updated[idx] = { ...review, name: e.target.value };
-                                      setSettingsForm({
-                                        ...settingsForm,
-                                        reviewsSection: {
-                                          ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                          reviews: updated
-                                        }
-                                      });
-                                    }}
-                                    className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
-                                    City / Location
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={review.location}
-                                    onChange={e => {
-                                      const updated = [...(settingsForm.reviewsSection?.reviews || [])];
-                                      updated[idx] = { ...review, location: e.target.value };
-                                      setSettingsForm({
-                                        ...settingsForm,
-                                        reviewsSection: {
-                                          ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                          reviews: updated
-                                        }
-                                      });
-                                    }}
-                                    className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
-                                    Rating Stars (1 - 5)
-                                  </label>
-                                  <select
-                                    value={review.rating || 5}
-                                    onChange={e => {
-                                      const updated = [...(settingsForm.reviewsSection?.reviews || [])];
-                                      updated[idx] = { ...review, rating: Number(e.target.value) };
-                                      setSettingsForm({
-                                        ...settingsForm,
-                                        reviewsSection: {
-                                          ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                          reviews: updated
-                                        }
-                                      });
-                                    }}
-                                    className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
-                                  >
-                                    <option value={5}>⭐⭐⭐⭐⭐ (5 Stars)</option>
-                                    <option value={4}>⭐⭐⭐⭐ (4 Stars)</option>
-                                    <option value={3}>⭐⭐⭐ (3 Stars)</option>
-                                    <option value={2}>⭐⭐ (2 Stars)</option>
-                                    <option value={1}>⭐ (1 Star)</option>
-                                  </select>
-                                </div>
-                              </div>
-
-                              {/* Review Comment Textarea */}
-                              <div>
-                                <label className="block text-[11px] font-semibold text-stone-600 mb-0.5">
-                                  Review & Feedback Comment
-                                </label>
-                                <textarea
-                                  rows={2}
-                                  value={review.comment}
-                                  onChange={e => {
-                                    const updated = [...(settingsForm.reviewsSection?.reviews || [])];
-                                    updated[idx] = { ...review, comment: e.target.value };
-                                    setSettingsForm({
-                                      ...settingsForm,
-                                      reviewsSection: {
-                                        ...(settingsForm.reviewsSection || { title: '', subtitle: '', ratingText: '', guaranteeBadge: '', reviews: [] }),
-                                        reviews: updated
-                                      }
-                                    });
-                                  }}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
-                                />
-                              </div>
-
-                              {/* Contact & Photo Info if submitted by user */}
-                              {(review.phone || review.email || review.photo) && (
-                                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500 pt-1 border-t border-stone-200/50">
-                                  <div className="flex items-center gap-3">
-                                    {review.phone && <span>📞 {review.phone}</span>}
-                                    {review.email && <span>✉️ {review.email}</span>}
-                                  </div>
-                                  {review.photo && (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-semibold text-stone-600 text-[11px]">Photo:</span>
-                                      <div 
-                                        className="w-8 h-8 rounded-lg overflow-hidden border border-stone-300 cursor-pointer shadow-2xs"
-                                        onClick={() => window.open(review.photo, '_blank')}
+                                  {/* Requirement 11: Preserved Original Comment Display */}
+                                  {review.originalComment && review.originalComment !== review.comment && (
+                                    <div className="text-[11px] pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedOriginalId(expandedOriginalId === review.id ? null : review.id)}
+                                        className="text-stone-500 hover:text-stone-700 font-semibold underline cursor-pointer"
                                       >
-                                        <img src={review.photo} alt="Customer upload" className="w-full h-full object-cover" />
-                                      </div>
+                                        {expandedOriginalId === review.id ? 'Hide Original Customer Text' : 'View Original Customer Text'}
+                                      </button>
+                                      {expandedOriginalId === review.id && (
+                                        <div className="mt-1 p-2.5 bg-stone-100/80 rounded-lg border border-stone-200 text-stone-600 italic">
+                                          Original: "{review.originalComment}"
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                          ))}
+
+                                {/* Customer Uploaded Photo if present */}
+                                {review.photo && (
+                                  <div className="flex items-center gap-2 p-2 bg-white rounded-xl border border-stone-200 text-xs">
+                                    <span className="font-semibold text-stone-600 text-[11px]">Attached Photo:</span>
+                                    <div 
+                                      className="w-10 h-10 rounded-lg overflow-hidden border border-stone-300 cursor-pointer shadow-2xs"
+                                      onClick={() => window.open(review.photo, '_blank')}
+                                      title="Click to view full photo"
+                                    >
+                                      <img src={review.photo} alt="Customer upload" className="w-full h-full object-cover" />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Store Reply Section (Requirement 10) */}
+                                <div className="space-y-1.5 pt-1">
+                                  {review.storeReply && replyingReviewId !== review.id ? (
+                                    <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 text-xs space-y-1">
+                                      <div className="flex items-center justify-between text-[11px]">
+                                        <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                                          <Store className="w-3.5 h-3.5 text-emerald-700" />
+                                          <span>Public Store Reply</span>
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setReplyingReviewId(review.id);
+                                              setReplyingText(review.storeReply || '');
+                                            }}
+                                            className="text-emerald-800 hover:underline font-semibold cursor-pointer"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveStoreReply(review.id)}
+                                            className="text-rose-700 hover:underline font-semibold cursor-pointer"
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <p className="text-stone-700 italic">
+                                        "{review.storeReply}"
+                                      </p>
+                                    </div>
+                                  ) : replyingReviewId === review.id ? (
+                                    <div className="p-3 bg-white rounded-xl border border-emerald-300 space-y-2">
+                                      <label className="block text-[11px] font-bold text-emerald-950">
+                                        Add / Edit Public Store Reply
+                                      </label>
+                                      <textarea
+                                        rows={2}
+                                        value={replyingText}
+                                        onChange={e => setReplyingText(e.target.value)}
+                                        placeholder="Thank you! We're glad you loved the crunch..."
+                                        className="w-full p-2 bg-stone-50 rounded-lg border border-stone-300 text-xs focus:bg-white focus:outline-none"
+                                      />
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setReplyingReviewId(null);
+                                            setReplyingText('');
+                                          }}
+                                          className="px-3 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSaveStoreReply(review.id)}
+                                          className="px-3 py-1 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold cursor-pointer"
+                                        >
+                                          Publish Store Reply
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReplyingReviewId(review.id);
+                                        setReplyingText('');
+                                      }}
+                                      className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Store className="w-3.5 h-3.5" />
+                                      <span>Add Public Store Reply</span>
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Main Moderation Action Buttons (Requirement 3: Approve / Reject / Hide) */}
+                                <div className="pt-2 border-t border-stone-200/80 flex flex-wrap items-center justify-between gap-2">
+                                  <div className="text-[11px] text-stone-500">
+                                    ID: <span className="font-mono">{review.id}</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {/* Approve Button */}
+                                    {!isApproved && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleApproveReview(review.id)}
+                                        className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shadow-xs"
+                                        title="Approve review so it appears publicly on the store"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                        <span>Approve & Publish</span>
+                                      </button>
+                                    )}
+
+                                    {/* Reject / Hide Button */}
+                                    {!isRejected && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRejectReview(review.id)}
+                                        className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                        title="Reject or hide review from public store"
+                                      >
+                                        <EyeOff className="w-3.5 h-3.5 text-stone-500" />
+                                        <span>Reject / Hide</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* TAB: PHOTO GALLERY MANAGER */}
               {activeTab === 'gallery' && (
@@ -3067,51 +4327,229 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     )}
                   </div>
 
-                  {orders.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-2xl border border-stone-200 p-6">
-                      <ShoppingCart className="w-10 h-10 text-stone-300 mx-auto mb-2" />
-                      <p className="text-sm font-semibold text-stone-700">No orders received yet</p>
-                      <p className="text-xs text-stone-400 mt-0.5">
-                        When customers tap 'Buy Now' and 'PLACE ORDER ON WHATSAPP', their order details will appear here.
-                      </p>
+                  {/* Order Search & Status Filter Toolbar */}
+                  <div className="bg-white p-3 sm:p-4 rounded-2xl border border-stone-200/90 shadow-2xs space-y-3">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                        <input
+                          type="text"
+                          placeholder="Search orders by Order #, Customer Name, Phone, or Courier AWB..."
+                          value={orderSearchQuery}
+                          onChange={e => setOrderSearchQuery(e.target.value)}
+                          className="w-full pl-9 pr-3.5 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+                        {[
+                          { id: 'all', label: `All (${orders.length})` },
+                          { id: 'Pending', label: `Pending (${orders.filter(o => o.status === 'Pending').length})` },
+                          { id: 'Confirmed', label: 'Confirmed' },
+                          { id: 'Shipped', label: 'Shipped' },
+                          { id: 'Delivered', label: 'Delivered' },
+                          { id: 'Cancelled', label: 'Cancelled' },
+                        ].map(status => (
+                          <button
+                            key={status.id}
+                            type="button"
+                            onClick={() => setOrderStatusFilter(status.id)}
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                              orderStatusFilter === status.id
+                                ? 'bg-emerald-800 text-white shadow-2xs'
+                                : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+                            }`}
+                          >
+                            {status.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {orders.map(order => (
+
+                    {/* PDF Batch & Detail Export Controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-stone-100 text-xs">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 cursor-pointer font-bold text-stone-700">
+                          <input
+                            type="checkbox"
+                            checked={orders.length > 0 && selectedOrderIds.length === orders.length}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSelectedOrderIds(orders.map(o => o.id));
+                              } else {
+                                setSelectedOrderIds([]);
+                              }
+                            }}
+                            className="w-4 h-4 accent-emerald-800 rounded"
+                          />
+                          <span>Select All ({selectedOrderIds.length}/{orders.length})</span>
+                        </label>
+                        {selectedOrderIds.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderIds([])}
+                            className="text-stone-400 hover:text-stone-700 text-[11px] underline"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {selectedOrderIds.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const selectedOrders = orders.filter(o => selectedOrderIds.includes(o.id));
+                              downloadOrdersReportPdf(selectedOrders, storeSettings, `Selected ${selectedOrders.length} Orders Detailed Report`);
+                            }}
+                            className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+                          >
+                            <Download className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Download Selected ({selectedOrderIds.length}) PDF</span>
+                          </button>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => downloadOrdersReportPdf(orders, storeSettings, 'All Orders Detailed Audit Report')}
+                          disabled={orders.length === 0}
+                          className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-emerald-800" />
+                          <span>Download All Orders PDF</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const filteredAdminOrders = orders.filter(o => {
+                      if (orderStatusFilter !== 'all' && o.status !== orderStatusFilter) return false;
+                      if (!orderSearchQuery.trim()) return true;
+                      const q = orderSearchQuery.toLowerCase().trim();
+                      return (
+                        o.orderNumber.toLowerCase().includes(q) ||
+                        o.customerName.toLowerCase().includes(q) ||
+                        o.phone.toLowerCase().includes(q) ||
+                        (o.courierTrackingNumber && o.courierTrackingNumber.toLowerCase().includes(q))
+                      );
+                    });
+
+                    if (orders.length === 0) {
+                      return (
+                        <div className="text-center py-12 bg-white rounded-2xl border border-stone-200 p-6">
+                          <ShoppingCart className="w-10 h-10 text-stone-300 mx-auto mb-2" />
+                          <p className="text-sm font-semibold text-stone-700">No orders received yet</p>
+                          <p className="text-xs text-stone-400 mt-0.5">
+                            When customers tap 'Buy Now' and place orders, their order details will appear here.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    if (filteredAdminOrders.length === 0) {
+                      return (
+                        <div className="text-center py-8 bg-white rounded-2xl border border-stone-200 p-6 text-xs text-stone-400">
+                          No orders match "{orderSearchQuery}" with status "{orderStatusFilter}".
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-3">
+                        {filteredAdminOrders.map(order => (
                         <div key={order.id} className="bg-white p-4 rounded-2xl border border-stone-200 space-y-3 shadow-xs">
                           <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-stone-100">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={selectedOrderIds.includes(order.id)}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setSelectedOrderIds(prev => [...prev, order.id]);
+                                  } else {
+                                    setSelectedOrderIds(prev => prev.filter(id => id !== order.id));
+                                  }
+                                }}
+                                className="w-4 h-4 accent-emerald-800 rounded cursor-pointer"
+                                title="Select order for batch operations"
+                              />
                               <span className="font-mono font-bold text-xs bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded">
                                 #{order.orderNumber}
                               </span>
                               <span className="text-xs text-stone-500">
                                 {new Date(order.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                               </span>
+
+                              <button
+                                type="button"
+                                onClick={() => downloadOrderInvoicePdf(order, storeSettings)}
+                                className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                title="Download Customer Invoice PDF"
+                              >
+                                <Download className="w-3 h-3 text-amber-700" />
+                                <span>Invoice PDF</span>
+                              </button>
                             </div>
 
-                            {/* Status Selector */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-stone-500 font-medium">Status:</span>
-                              <select
-                                value={order.status}
-                                onChange={e => updateOrderStatus(order.id, e.target.value as Order['status'])}
-                                className={`text-xs font-bold px-2 py-1 rounded-lg border ${
-                                  order.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
-                                  order.status === 'Shipped' ? 'bg-sky-50 text-sky-800 border-sky-300' :
-                                  order.status === 'Delivered' ? 'bg-amber-50 text-amber-900 border-amber-300' :
-                                  'bg-stone-50 text-stone-700 border-stone-300'
-                                }`}
-                              >
-                                <option value="Pending">Pending</option>
-                                <option value="Confirmed">Confirmed</option>
-                                <option value="Shipped">Shipped</option>
-                                <option value="Delivered">Delivered</option>
-                                <option value="Cancelled">Cancelled</option>
-                              </select>
+                            {/* Status Selectors (Order Status & Payment Status kept separate) */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Order Fulfillment Status */}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] text-stone-500 font-bold uppercase tracking-wider">Order:</span>
+                                <select
+                                  value={order.status}
+                                  onChange={e => updateOrderStatus(order.id, e.target.value as Order['status'])}
+                                  className={`text-xs font-bold px-2.5 py-1.5 min-h-[38px] rounded-xl border cursor-pointer ${
+                                    order.status === 'Confirmed' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
+                                    order.status === 'Shipped' ? 'bg-sky-50 text-sky-800 border-sky-300' :
+                                    order.status === 'Delivered' ? 'bg-amber-50 text-amber-900 border-amber-300' :
+                                    order.status === 'Cancelled' ? 'bg-rose-50 text-rose-800 border-rose-300' :
+                                    'bg-stone-50 text-stone-700 border-stone-300'
+                                  }`}
+                                >
+                                  <option value="Pending">Pending</option>
+                                  <option value="Confirmed">Confirmed</option>
+                                  <option value="Shipped">Shipped</option>
+                                  <option value="Delivered">Delivered</option>
+                                  <option value="Cancelled">Cancelled</option>
+                                </select>
+                              </div>
+
+                              {/* Payment Status (Controlled by Admin Only) */}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] text-stone-500 font-bold uppercase tracking-wider">Payment:</span>
+                                <select
+                                  value={order.paymentStatus || (order.paymentMethod === 'cod' ? 'COD Pending' : 'Pending')}
+                                  onChange={e => updatePaymentStatus(order.id, e.target.value as PaymentStatus)}
+                                  className={`text-xs font-bold px-2.5 py-1.5 min-h-[38px] rounded-xl border cursor-pointer ${
+                                    (order.paymentStatus === 'Paid / Verified' || order.paymentStatus === 'COD Collected')
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                      : (order.paymentStatus === 'Verification Required')
+                                      ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                      : (order.paymentStatus === 'COD Pending')
+                                      ? 'bg-sky-50 text-sky-800 border-sky-300'
+                                      : (order.paymentStatus === 'Failed')
+                                      ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                      : (order.paymentStatus === 'Refunded')
+                                      ? 'bg-purple-50 text-purple-800 border-purple-300'
+                                      : 'bg-stone-50 text-stone-700 border-stone-300'
+                                  }`}
+                                >
+                                  <option value="Pending">Pending</option>
+                                  <option value="Verification Required">Verification Required</option>
+                                  <option value="Paid / Verified">Paid / Verified</option>
+                                  <option value="COD Pending">COD Pending</option>
+                                  <option value="COD Collected">COD Collected</option>
+                                  <option value="Failed">Failed</option>
+                                  <option value="Refunded">Refunded</option>
+                                </select>
+                              </div>
 
                               <button
                                 onClick={() => deleteOrder(order.id)}
-                                className="text-stone-400 hover:text-rose-600 p-1"
+                                className="min-h-[38px] min-w-[38px] rounded-xl bg-stone-100 hover:bg-rose-50 text-stone-400 hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer"
                                 title="Delete order record"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -3143,53 +4581,120 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               </p>
                             </div>
 
-                            {/* Order Items */}
-                            <div>
-                              <span className="text-[10px] uppercase font-bold text-stone-400 block mb-0.5">
-                                Product & Amount
-                              </span>
-                              <p className="font-semibold text-stone-800">
+                            {/* Order Items & Complete Pricing Breakdown */}
+                            <div className="bg-[#FAF8F5] p-2.5 rounded-xl border border-stone-200/80 space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] uppercase font-bold text-stone-500 block">
+                                  Pricing Breakdown
+                                </span>
+                                {order.pricingSnapshot && (
+                                  <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100/80 px-1.5 py-0.5 rounded" title="Immutable pricing snapshot captured at purchase time">
+                                    Snapshot Saved
+                                  </span>
+                                )}
+                              </div>
+                              <p className="font-bold text-stone-900 text-xs">
                                 {order.productName} ({order.productWeight})
                               </p>
-                              <p className="text-stone-600">
-                                Qty: {order.quantity} · Subtotal: ₹{order.subtotal}
-                              </p>
-                              <p className="text-stone-600">
-                                Delivery: {order.deliveryCharge === 0 ? 'FREE' : `₹${order.deliveryCharge}`}
-                              </p>
-                              <p className="font-extrabold text-sm text-emerald-950 mt-1">
-                                Total: ₹{order.totalAmount}
-                              </p>
+                              <div className="space-y-0.5 text-[11px] text-stone-600 pt-1 border-t border-stone-200/60">
+                                <div className="flex justify-between">
+                                  <span>Unit Price:</span>
+                                  <span className="font-medium text-stone-800">
+                                    ₹{order.unitPrice} {order.originalPrice && order.originalPrice > order.unitPrice ? <span className="text-[10px] text-stone-400 line-through">(MRP ₹{order.originalPrice})</span> : null}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Quantity:</span>
+                                  <span className="font-medium text-stone-800">{order.quantity}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Base Amount ({order.quantity} × ₹{order.unitPrice}):</span>
+                                  <span className="font-medium text-stone-800">₹{order.baseAmount ?? round2(order.unitPrice * order.quantity)}</span>
+                                </div>
+                                {(order.discountAmount ?? 0) > 0 ? (
+                                  <div className="flex justify-between text-emerald-800 font-semibold">
+                                    <span>Discount {order.discountType === 'percentage' && order.discountValue ? `(${order.discountValue}%)` : ''}:</span>
+                                    <span>−₹{order.discountAmount}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex justify-between text-stone-400">
+                                    <span>Discount:</span>
+                                    <span>₹0</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span>Subtotal:</span>
+                                  <span className="font-medium text-stone-800">₹{order.subtotal}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Delivery Charge:</span>
+                                  <span className={`font-medium ${order.deliveryCharge === 0 ? 'text-emerald-700 font-bold' : 'text-stone-800'}`}>
+                                    {order.deliveryCharge === 0 ? 'FREE (₹0)' : `₹${order.deliveryCharge}`}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-xs font-extrabold text-emerald-950 pt-1 border-t border-stone-200">
+                                  <span>Final Payable Total:</span>
+                                  <span className="text-emerald-900 font-bold">₹{order.totalAmount}</span>
+                                </div>
+                              </div>
                             </div>
 
                             {/* Payment Info */}
-                            <div>
+                            <div className="space-y-1.5">
                               <span className="text-[10px] uppercase font-bold text-stone-400 block mb-0.5">
                                 Payment Details
                               </span>
-                              <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
-                                order.paymentMethod === 'upi'
-                                  ? 'bg-emerald-100 text-emerald-900'
-                                  : 'bg-amber-100 text-amber-900'
-                              }`}>
-                                {order.paymentMethod === 'upi' ? 'Manual UPI' : 'Cash On Delivery'}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
+                                  order.paymentMethod === 'upi'
+                                    ? 'bg-emerald-100 text-emerald-900'
+                                    : 'bg-amber-100 text-amber-900'
+                                }`}>
+                                  {order.paymentMethod === 'upi' ? 'UPI Payment' : 'Cash On Delivery'}
+                                </span>
+                                <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold border ${
+                                  (order.paymentStatus === 'Paid / Verified' || order.paymentStatus === 'COD Collected')
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                    : (order.paymentStatus === 'Verification Required')
+                                    ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                    : (order.paymentStatus === 'COD Pending')
+                                    ? 'bg-sky-50 text-sky-800 border-sky-300'
+                                    : (order.paymentStatus === 'Failed')
+                                    ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                    : (order.paymentStatus === 'Refunded')
+                                    ? 'bg-purple-50 text-purple-800 border-purple-300'
+                                    : 'bg-stone-50 text-stone-700 border-stone-300'
+                                }`}>
+                                  {order.paymentStatus || (order.paymentMethod === 'cod' ? 'COD Pending' : 'Pending')}
+                                </span>
+                              </div>
 
                               {order.upiRefNumber && (
-                                <p className="font-mono text-[11px] text-stone-700 mt-1">
-                                  Ref/UTR: <span className="font-bold">{order.upiRefNumber}</span>
-                                </p>
+                                <div className="flex items-center gap-1.5 p-1.5 bg-stone-50 rounded-lg border border-stone-200 mt-1">
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-[10px] text-stone-500 uppercase block font-semibold">UTR Number:</span>
+                                    <span className="font-mono font-bold text-xs text-stone-900 truncate block select-all">{order.upiRefNumber}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => navigator.clipboard.writeText(order.upiRefNumber || '')}
+                                    className="p-1 text-stone-500 hover:text-emerald-800 rounded bg-white border border-stone-200 cursor-pointer"
+                                    title="Copy UTR Number"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </div>
                               )}
 
                               {order.paymentScreenshot && (
-                                <div className="mt-2">
+                                <div className="mt-1">
                                   <button
                                     type="button"
                                     onClick={() => setPreviewScreenshotUrl(order.paymentScreenshot || null)}
                                     className="text-xs text-emerald-800 font-semibold hover:underline flex items-center gap-1"
                                   >
                                     <ImageIcon className="w-3.5 h-3.5" />
-                                    <span>View Screenshot</span>
+                                    <span>View Legacy Screenshot</span>
                                   </button>
                                 </div>
                               )}
@@ -3200,6 +4705,236 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                 </p>
                               )}
                             </div>
+                          </div>
+
+                          {/* Order Financial Controls & Corrections */}
+                          <div className="pt-2 border-t border-stone-100">
+                            {(() => {
+                              const isCompleted = order.status === 'Delivered' || order.paymentStatus === 'COD Collected' || order.paymentStatus === 'Paid / Verified';
+                              const isUnlocked = unlockedDeliveredOrderIds.has(order.id);
+                              const isLocked = isCompleted && !isUnlocked;
+                              const isEditing = editingFinancialOrderId === order.id;
+
+                              // Live recalculation values
+                              const liveQty = Math.max(1, Math.floor(Number(financialForm.quantity) || 1));
+                              const livePrice = Math.max(0, round2(Number(financialForm.unitPrice) || 0));
+                              const liveBase = round2(livePrice * liveQty);
+                              const liveDiscount = Math.max(0, Math.min(liveBase, round2(Number(financialForm.discountAmount) || 0)));
+                              const liveSubtotal = Math.max(0, round2(liveBase - liveDiscount));
+                              const liveDelivery = Math.max(0, round2(Number(financialForm.deliveryCharge) || 0));
+                              const liveTotal = Math.max(0, round2(liveSubtotal + liveDelivery));
+
+                              return (
+                                <div className="space-y-2">
+                                  {/* Bar with Edit / Unlock trigger */}
+                                  {!isEditing && (
+                                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-stone-50 p-2 rounded-xl border border-stone-200">
+                                      <div className="flex items-center gap-2">
+                                        <Calculator className="w-3.5 h-3.5 text-stone-500" />
+                                        <span className="font-semibold text-stone-700">Financial Order Control:</span>
+                                        {isLocked ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                                            <Lock className="w-3 h-3 text-amber-700" />
+                                            <span>Protected (Completed Order)</span>
+                                          </span>
+                                        ) : isCompleted && isUnlocked ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300">
+                                            <Unlock className="w-3 h-3 text-rose-700" />
+                                            <span>Unlocked for Correction</span>
+                                          </span>
+                                        ) : (
+                                          <span className="text-[11px] text-stone-500">
+                                            Editable by authenticated admin
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {isLocked ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => setWarningUnlockOrder(order)}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-amber-200/80 hover:bg-amber-300 text-amber-950 rounded-lg transition-colors cursor-pointer"
+                                          title="Unlock completed order financials for genuine accounting correction"
+                                        >
+                                          <Unlock className="w-3.5 h-3.5" />
+                                          <span>Unlock for Correction</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleStartEditFinancials(order)}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg transition-colors shadow-xs cursor-pointer"
+                                        >
+                                          <Edit3 className="w-3.5 h-3.5" />
+                                          <span>Modify Financials</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Inline Financial Modification Form */}
+                                  {isEditing && (
+                                    <div className="p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl space-y-3">
+                                      <div className="flex items-center justify-between pb-2 border-b border-amber-200/80">
+                                        <div className="flex items-center gap-2">
+                                          <Calculator className="w-4 h-4 text-amber-800" />
+                                          <span className="text-xs font-bold text-amber-950">
+                                            Modify Financial Values — Order #{order.orderNumber}
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingFinancialOrderId(null)}
+                                          className="text-xs text-stone-500 hover:text-stone-800 cursor-pointer font-semibold"
+                                        >
+                                          ✕ Cancel
+                                        </button>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                                        {/* Quantity */}
+                                        <div>
+                                          <label className="block text-[11px] font-semibold text-stone-700 mb-0.5">
+                                            Quantity *
+                                          </label>
+                                          <input
+                                            type="number"
+                                            min={1}
+                                            max={100}
+                                            value={financialForm.quantity}
+                                            onChange={e => setFinancialForm({ ...financialForm, quantity: Math.max(1, Number(e.target.value) || 1) })}
+                                            className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
+                                          />
+                                        </div>
+
+                                        {/* Unit Price */}
+                                        <div>
+                                          <label className="block text-[11px] font-semibold text-stone-700 mb-0.5">
+                                            Unit Price (₹) *
+                                          </label>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            value={financialForm.unitPrice}
+                                            onChange={e => setFinancialForm({ ...financialForm, unitPrice: Math.max(0, Number(e.target.value) || 0) })}
+                                            className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
+                                          />
+                                        </div>
+
+                                        {/* Discount Amount */}
+                                        <div>
+                                          <label className="block text-[11px] font-semibold text-stone-700 mb-0.5">
+                                            Discount (₹)
+                                          </label>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            max={liveBase}
+                                            value={financialForm.discountAmount}
+                                            onChange={e => setFinancialForm({ ...financialForm, discountAmount: Math.max(0, Number(e.target.value) || 0) })}
+                                            className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
+                                          />
+                                          <span className="text-[10px] text-stone-500 block mt-0.5">Max: ₹{liveBase}</span>
+                                        </div>
+
+                                        {/* Delivery Charge */}
+                                        <div>
+                                          <label className="block text-[11px] font-semibold text-stone-700 mb-0.5">
+                                            Delivery (₹)
+                                          </label>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            value={financialForm.deliveryCharge}
+                                            onChange={e => setFinancialForm({ ...financialForm, deliveryCharge: Math.max(0, Number(e.target.value) || 0) })}
+                                            className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Reason / Admin Note */}
+                                      <div>
+                                        <label className="block text-[11px] font-semibold text-stone-700 mb-0.5">
+                                          Reason for Modification / Audit Note (Required for records) *
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={financialForm.adminNote}
+                                          onChange={e => setFinancialForm({ ...financialForm, adminNote: e.target.value })}
+                                          placeholder="e.g. Adjusted delivery discount as approved by store manager"
+                                          className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs"
+                                        />
+                                      </div>
+
+                                      {/* Live Recalculation Summary */}
+                                      <div className="bg-white p-2.5 rounded-lg border border-amber-300/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                        <div className="space-y-0.5 text-stone-600">
+                                          <div>Base Amount: <strong className="text-stone-900">₹{liveBase}</strong></div>
+                                          <div>Subtotal (Base − Disc): <strong className="text-stone-900">₹{liveSubtotal}</strong></div>
+                                          <div>Delivery: <strong className="text-stone-900">₹{liveDelivery}</strong></div>
+                                        </div>
+
+                                        <div className="text-right">
+                                          <span className="text-[10px] uppercase font-bold text-stone-500 block">
+                                            Automatically Recalculated Total:
+                                          </span>
+                                          <span className="text-base sm:text-lg font-black text-emerald-950 font-serif">
+                                            ₹{liveTotal}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Action buttons */}
+                                      <div className="flex items-center justify-end gap-2 pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingFinancialOrderId(null)}
+                                          className="px-3 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-lg text-xs font-semibold cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRequestSaveFinancials(order)}
+                                          className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                                        >
+                                          <Check className="w-3.5 h-3.5 text-amber-300" />
+                                          <span>Review & Save Changes</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
+                            {/* Order Audit History Log */}
+                            {order.auditHistory && order.auditHistory.length > 0 && (
+                              <div className="mt-2 p-2.5 bg-stone-50 rounded-xl border border-stone-200 space-y-1.5 text-xs">
+                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-stone-700">
+                                  <History className="w-3.5 h-3.5 text-stone-500" />
+                                  <span>Audit History ({order.auditHistory.length} adjustment{order.auditHistory.length > 1 ? 's' : ''}):</span>
+                                </div>
+                                <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                                  {order.auditHistory.map((entry, idx) => (
+                                    <div key={idx} className="bg-white p-1.5 rounded-lg border border-stone-200/80 text-[11px] text-stone-600 space-y-0.5">
+                                      <div className="flex items-center justify-between text-stone-500 text-[10px]">
+                                        <span>{new Date(entry.changedAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                                        <span className="font-semibold text-emerald-800">By: {entry.changedBy}</span>
+                                      </div>
+                                      <div className="font-medium text-stone-800">
+                                        <strong className="text-stone-900">{entry.field}:</strong> {String(entry.oldValue)} → <span className="text-emerald-900 font-bold">{String(entry.newValue)}</span>
+                                      </div>
+                                      {entry.note && (
+                                        <div className="text-stone-500 italic text-[10px]">
+                                          Note: "{entry.note}"
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           {/* Tracking & Courier Section */}
@@ -3357,7 +5092,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                         </div>
                       ))}
                     </div>
-                  )}
+                  );
+                })()}
                 </div>
               )}
 
@@ -3443,7 +5179,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
               )}
 
               {/* TAB 6: BACKUP & RESET */}
-              {activeTab === 'backup' && (
+              {(activeTab === 'backup' || activeTab === 'settings') && (
                 <div className="space-y-4 max-w-xl">
                   <div>
                     <h3 className="text-base font-bold text-stone-900 font-serif">
@@ -3514,7 +5250,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 </div>
               )}
             </div>
+
+            {/* Mobile Bottom Quick Tab Bar (Shown only on mobile view < md) */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-stone-200 h-16 flex items-center justify-around px-2 pb-safe shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenStoreTab('overview');
+                }}
+                className={`flex flex-col items-center justify-center flex-1 py-1 min-h-[44px] cursor-pointer ${
+                  activeTab === 'overview' ? 'text-emerald-800 font-bold' : 'text-stone-500'
+                }`}
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                <span className="text-[10px] mt-0.5">Overview</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenStoreTab('orders');
+                }}
+                className={`flex flex-col items-center justify-center flex-1 py-1 relative min-h-[44px] cursor-pointer ${
+                  activeTab === 'orders' ? 'text-emerald-800 font-bold' : 'text-stone-500'
+                }`}
+              >
+                <div className="relative">
+                  <ShoppingCart className="w-5 h-5" />
+                  {orders.filter(o => o.status === 'Pending').length > 0 && (
+                    <span className="absolute -top-1 -right-2 bg-amber-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+                      {orders.filter(o => o.status === 'Pending').length}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] mt-0.5">Orders</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleOpenStoreTab('products');
+                }}
+                className={`flex flex-col items-center justify-center flex-1 py-1 min-h-[44px] cursor-pointer ${
+                  activeTab === 'products' ? 'text-emerald-800 font-bold' : 'text-stone-500'
+                }`}
+              >
+                <Package className="w-5 h-5" />
+                <span className="text-[10px] mt-0.5">Products</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="flex flex-col items-center justify-center flex-1 py-1 min-h-[44px] cursor-pointer text-stone-600 hover:text-emerald-800"
+              >
+                <Menu className="w-5 h-5" />
+                <span className="text-[10px] mt-0.5">Menu (16)</span>
+              </button>
+            </div>
           </div>
+        </div>
         )}
 
         {/* Screenshot preview modal */}
@@ -3533,6 +5328,162 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 Click anywhere to close
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Warning Unlock Completed Order Modal */}
+        {warningUnlockOrder && (
+          <div className="fixed inset-0 z-80 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-300 space-y-4">
+              <div className="flex items-center gap-3 text-amber-900 pb-3 border-b border-amber-100">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-800 shrink-0">
+                  <ShieldAlert className="w-5 h-5 text-amber-800" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base font-serif text-stone-900">
+                    Unlock Completed Order?
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Order #{warningUnlockOrder.orderNumber}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200/80 text-xs text-amber-950 space-y-2">
+                <p className="font-semibold">
+                  ⚠️ This order is marked as <strong>{warningUnlockOrder.status}</strong> / <strong>{warningUnlockOrder.paymentStatus}</strong>.
+                </p>
+                <p className="text-stone-600 leading-relaxed">
+                  Financial figures for completed transactions are read-only by default to prevent accidental modifications to settled accounts and customer receipts.
+                </p>
+                <p className="text-stone-600 leading-relaxed">
+                  Only unlock if a genuine accounting correction, quantity refund, or delivery charge rectification is strictly required. Any changes will be recorded with your admin ID and timestamp in the order's audit history.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setWarningUnlockOrder(null)}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Cancel / Keep Locked
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmUnlockDeliveredOrder}
+                  className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Unlock className="w-3.5 h-3.5" />
+                  <span>Unlock for Correction</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal Before Saving Financial Modifications */}
+        {confirmFinancialOrder && (
+          <div className="fixed inset-0 z-80 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 space-y-4">
+              <div className="flex items-center gap-3 text-emerald-950 pb-3 border-b border-stone-100">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
+                  <Calculator className="w-5 h-5 text-emerald-800" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base font-serif text-stone-900">
+                    Confirm Financial Modification
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Order #{confirmFinancialOrder.order.orderNumber} ({confirmFinancialOrder.order.customerName})
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <p className="text-stone-600">
+                  Please review the recalculated financial values before applying changes. A permanent audit entry will be created.
+                </p>
+
+                {/* Changes summary box */}
+                <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-stone-400 block">
+                    Detected Modifications:
+                  </span>
+                  {confirmFinancialOrder.changesSummary.length > 0 ? (
+                    <ul className="space-y-1">
+                      {confirmFinancialOrder.changesSummary.map((change, idx) => (
+                        <li key={idx} className="flex items-center gap-1.5 font-medium text-stone-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                          <span>{change}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-stone-500 italic">No monetary values changed.</p>
+                  )}
+                </div>
+
+                {/* Total amount highlight */}
+                <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-200 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-800 block">
+                      Previous Total: ₹{confirmFinancialOrder.order.totalAmount}
+                    </span>
+                    <span className="text-xs font-bold text-emerald-950">
+                      New Recalculated Total:
+                    </span>
+                  </div>
+                  <span className="text-xl font-black text-emerald-900 font-serif">
+                    ₹{confirmFinancialOrder.newTotal}
+                  </span>
+                </div>
+
+                {/* Reason note */}
+                {confirmFinancialOrder.adminNote && (
+                  <div className="text-stone-600 bg-stone-50 p-2.5 rounded-xl border border-stone-200">
+                    <strong className="text-stone-900">Audit Reason:</strong> "{confirmFinancialOrder.adminNote}"
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setConfirmFinancialOrder(null)}
+                  disabled={isSavingFinancials}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  Go Back / Edit Again
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteSaveFinancials}
+                  disabled={isSavingFinancials}
+                  className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSavingFinancials ? (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving to Ledger...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Confirm & Apply Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Financial Save Success Toast */}
+        {financialSaveToast && (
+          <div className="fixed bottom-6 right-6 z-90 bg-emerald-900 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold border border-emerald-700 animate-bounce">
+            <Check className="w-4 h-4 text-amber-300" />
+            <span>Order financials recalculated & audit trail updated!</span>
           </div>
         )}
       </div>

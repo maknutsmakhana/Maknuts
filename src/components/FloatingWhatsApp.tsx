@@ -6,9 +6,17 @@ import { createWhatsAppUrl } from '../utils/whatsapp';
 export const FloatingWhatsApp: React.FC = () => {
   const { storeSettings } = useStore();
 
+  if (storeSettings.sectionVisibility?.floatingWhatsApp === false || storeSettings.whatsAppSettings?.enableFloatingButton === false) {
+    return null;
+  }
+
+  const phoneNum = storeSettings.whatsAppSettings?.phoneNumber || storeSettings.whatsappNumber;
+  const prompt = storeSettings.whatsAppSettings?.supportMessageTemplate 
+    ? storeSettings.whatsAppSettings.supportMessageTemplate.replace('{customer_name}', 'Customer')
+    : `Hi ${storeSettings.shopName}! I would like to order or ask a question about Maknuts Makhana.`;
+
   const handleOpenWhatsApp = () => {
-    const text = `Hi ${storeSettings.shopName}! I would like to order or ask a question about Maknuts Makhana.`;
-    const url = createWhatsAppUrl(storeSettings.whatsappNumber, text);
+    const url = createWhatsAppUrl(phoneNum, prompt);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

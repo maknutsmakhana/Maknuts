@@ -3,7 +3,7 @@ import { useStore } from '../context/StoreContext';
 import { X, Shield, FileText, RotateCcw, Truck } from 'lucide-react';
 
 interface PolicyModalProps {
-  policyType: 'terms' | 'privacy' | 'returns' | 'shipping' | null;
+  policyType: 'terms' | 'privacy' | 'returns' | 'shipping' | 'cancellation' | null;
   onClose: () => void;
 }
 
@@ -32,6 +32,11 @@ export const PolicyModal: React.FC<PolicyModalProps> = ({ policyType, onClose })
       title: 'Shipping Policy',
       icon: Truck,
       content: storeSettings.policies.shipping,
+    },
+    cancellation: {
+      title: 'Cancellation Policy',
+      icon: RotateCcw,
+      content: storeSettings.policies.cancellation || 'Cancellation is accepted before dispatch. Contact our WhatsApp support with your Order ID.',
     },
   };
 

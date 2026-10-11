@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
 import { Check, Plus, Minus, ShoppingBag, MessageCircle, ShieldCheck, Sparkles, AlertCircle, Maximize2, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
+import { calculateOrderPricing } from '../utils/pricing';
 
 interface ProductCardProps {
   product: Product;
@@ -11,8 +12,15 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) => {
   const { storeSettings } = useStore();
-  const [quantity, setQuantity] = useState(1);
+  const minQty = Math.max(1, storeSettings?.minOrderQuantity || 1);
+  const maxQty = Math.max(minQty, storeSettings?.maxOrderQuantity || 20);
+  const [quantity, setQuantity] = useState(minQty);
   const [isImageZoomed, setIsImageZoomed] = useState(false);
+
+  // Keep quantity inside bounds if settings change
+  useEffect(() => {
+    setQuantity(prev => Math.min(Math.max(prev, minQty), maxQty));
+  }, [minQty, maxQty]);
 
   // Multiple product images resolution
   const productImages = (product.images && product.images.length > 0)
@@ -21,16 +29,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const activeImage = productImages[activeImageIndex] || product.image;
 
+  const cardPricing = calculateOrderPricing({
+    productPrice: product.price,
+    originalPrice: product.originalPrice,
+    quantity,
+    settings: storeSettings,
+  });
+
   const discountPercent = product.originalPrice > product.price
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
   const handleIncrement = () => {
-    setQuantity(prev => prev + 1);
+    setQuantity(prev => (prev < maxQty ? prev + 1 : maxQty));
   };
 
   const handleDecrement = () => {
-    setQuantity(prev => (prev > 1 ? prev - 1 : 1));
+    setQuantity(prev => (prev > minQty ? prev - 1 : minQty));
   };
 
   const handlePrevImage = (e: React.MouseEvent) => {
@@ -55,7 +70,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
         {/* Left Side: Product Image Display & Thumbnails */}
         <div className="md:col-span-6 bg-gradient-to-b from-[#F7F4EE] to-[#EFE9DF] p-4 sm:p-6 md:p-8 flex flex-col justify-between items-center relative border-b md:border-b-0 md:border-r border-[#E9DFD1]">
           {/* Badge */}
-          <div className="w-full flex items-center justify-between gap-2 mb-2">
+          <div className="w-full flex items-center justify-start gap-2 mb-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-emerald-900 text-amber-200 shadow-sm">
               <Sparkles className="w-3 h-3 text-amber-300" />
               {product.badge || '100% Bihar Harvest'}
@@ -220,14 +235,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
             <div className="flex items-center justify-between bg-stone-50 p-2.5 rounded-xl border border-stone-200">
               <span className="text-xs font-bold text-stone-700 uppercase tracking-wider">
                 Select Quantity:
+                {(minQty > 1 || maxQty < 20) && (
+                  <span className="text-[10px] text-stone-400 font-normal lowercase ml-1">
+                    ({minQty} to {maxQty})
+                  </span>
+                )}
               </span>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleDecrement}
-                  disabled={quantity <= 1}
+                  disabled={quantity <= minQty}
                   className="w-10 h-10 rounded-lg bg-white border border-stone-300 flex items-center justify-center text-stone-700 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-xs cursor-pointer"
                   aria-label="Decrease quantity"
+                  title={quantity <= minQty ? `Minimum is ${minQty}` : 'Decrease'}
                 >
                   <Minus className="w-4 h-4" />
                 </button>
@@ -237,20 +258,38 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
                 <button
                   type="button"
                   onClick={handleIncrement}
-                  className="w-10 h-10 rounded-lg bg-white border border-stone-300 flex items-center justify-center text-stone-700 hover:bg-stone-100 transition-all active:scale-95 shadow-xs cursor-pointer"
+                  disabled={quantity >= maxQty}
+                  className="w-10 h-10 rounded-lg bg-white border border-stone-300 flex items-center justify-center text-stone-700 hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-xs cursor-pointer"
                   aria-label="Increase quantity"
+                  title={quantity >= maxQty ? `Maximum is ${maxQty}` : 'Increase'}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Subtotal preview */}
-            <div className="flex items-center justify-between text-xs px-1 text-stone-500">
-              <span>Item Total ({quantity} x ₹{product.price}):</span>
-              <span className="font-bold text-emerald-950 text-sm">
-                ₹{quantity * product.price}
-              </span>
+            {/* Subtotal preview with discounts if configured */}
+            <div className="space-y-1 text-xs px-1 text-stone-500">
+              <div className="flex items-center justify-between">
+                <span>Item Total ({quantity} × ₹{product.price}):</span>
+                <span className="font-semibold text-stone-800">
+                  ₹{cardPricing.baseAmount}
+                </span>
+              </div>
+              {cardPricing.discountAmount > 0 && (
+                <div className="flex items-center justify-between text-emerald-800 font-semibold">
+                  <span>Store Discount {cardPricing.discountType === 'percentage' ? `(${cardPricing.discountValue}%)` : ''}:</span>
+                  <span>−₹{cardPricing.discountAmount}</span>
+                </div>
+              )}
+              {cardPricing.discountAmount > 0 && (
+                <div className="flex items-center justify-between text-stone-600 font-medium pt-0.5 border-t border-stone-200">
+                  <span>Subtotal:</span>
+                  <span className="font-bold text-emerald-950 text-sm">
+                    ₹{cardPricing.subtotal}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Big Primary BUY NOW Button */}
@@ -263,7 +302,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
               <ShoppingBag className="w-5 h-5 text-amber-300" />
               <span>{storeSettings.buttons.buyNow || 'Buy Now'}</span>
               <span className="text-emerald-200 text-sm font-normal">
-                (₹{quantity * product.price})
+                (₹{cardPricing.subtotal})
               </span>
             </button>
           </div>

@@ -7,7 +7,7 @@ interface OrderSuccessModalProps {
   order: Order | null;
   storeSettings: StoreSettings;
   onClose: () => void;
-  onTrackOrder?: (orderNumber: string) => void;
+  onTrackOrder?: (orderNumber: string, phone?: string) => void;
 }
 
 export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
@@ -119,15 +119,28 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
 
             <div className="flex justify-between text-stone-600">
               <span>Payment Mode:</span>
-              <span className="font-semibold text-stone-800 capitalize">
-                {order.paymentMethod === 'upi' ? 'Manual UPI' : 'Cash On Delivery'}
+              <span className="font-semibold text-stone-800">
+                {order.paymentMethod === 'upi' ? 'UPI' : 'Cash On Delivery'}
+              </span>
+            </div>
+
+            <div className="flex justify-between text-stone-600">
+              <span>Payment Status:</span>
+              <span className="font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                {order.paymentStatus || (order.paymentMethod === 'cod' ? 'COD Pending' : 'Pending')}
               </span>
             </div>
 
             {order.upiRefNumber && (
               <div className="flex justify-between text-stone-600 font-mono">
-                <span>UPI Ref / UTR:</span>
+                <span>UPI UTR / Ref:</span>
                 <span className="font-semibold text-stone-800">{order.upiRefNumber}</span>
+              </div>
+            )}
+
+            {order.paymentMethod === 'upi' && (
+              <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-950 text-[11px]">
+                📸 <strong>Verification Note:</strong> After opening WhatsApp, please send your UPI payment screenshot in the chat for quick verification.
               </div>
             )}
 
@@ -143,7 +156,7 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
           {onTrackOrder && (
             <button
               type="button"
-              onClick={() => onTrackOrder(order.orderNumber)}
+              onClick={() => onTrackOrder(order.orderNumber, order.phone)}
               className="flex-1 py-3 px-4 rounded-xl bg-emerald-900 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
             >
               <Truck className="w-4 h-4 text-amber-300" />

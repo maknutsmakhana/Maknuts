@@ -41,7 +41,6 @@
         "supportPhone": { "type": "string", "description": "Support phone number" },
         "supportEmail": { "type": "string", "description": "Support email address" },
         "address": { "type": "string", "description": "Business physical address" },
-        "adminPassword": { "type": "string", "description": "Password for accessing admin dashboard" },
         "buttons": { "type": "object", "description": "Customizable button labels" },
         "policies": { "type": "object", "description": "Store terms, privacy, returns policies" }
       },
@@ -67,6 +66,7 @@
         "deliveryCharge": { "type": "number", "description": "Delivery charge in INR" },
         "totalAmount": { "type": "number", "description": "Total payable amount in INR" },
         "paymentMethod": { "type": "string", "enum": ["upi", "cod"], "description": "Selected payment method" },
+        "paymentStatus": { "type": "string", "enum": ["Pending", "Verification Required", "Paid / Verified", "Failed", "Refunded", "COD Pending", "COD Collected"], "description": "Payment verification status" },
         "upiRefNumber": { "type": "string", "description": "Optional UPI UTR reference number" },
         "paymentScreenshot": { "type": "string", "description": "Optional payment screenshot data" },
         "note": { "type": "string", "description": "Optional delivery instructions" },
@@ -84,13 +84,47 @@
         "customerName": { "type": "string", "description": "Customer name" },
         "phone": { "type": "string", "description": "Customer phone or WhatsApp number" },
         "email": { "type": "string", "description": "Customer email" },
+        "orderId": { "type": "string", "description": "Optional associated order ID" },
         "rating": { "type": "number", "description": "Rating out of 5 stars" },
         "category": { "type": "string", "description": "Feedback category" },
         "message": { "type": "string", "description": "Detailed feedback message or suggestion" },
+        "originalComment": { "type": "string", "description": "Original customer text if edited by admin" },
+        "adminEditedAt": { "type": "string", "description": "Timestamp when admin modified comment" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Moderation status" },
+        "verifiedBuyer": { "type": "boolean", "description": "Whether reviewer was verified against a delivered order" },
+        "storeReply": { "type": "string", "description": "Public store response from admin" },
+        "storeReplyAt": { "type": "string", "description": "Timestamp of public store response" },
         "photo": { "type": "string", "description": "Optional customer image attachment" },
         "createdAt": { "type": "string", "description": "Submission ISO timestamp" }
       },
-      "required": ["id", "customerName", "rating", "category", "message", "createdAt"]
+      "required": ["id", "customerName", "rating", "message", "status", "createdAt"]
+    },
+    "OrderTracking": {
+      "title": "OrderTracking",
+      "description": "Sanitized customer order tracking record accessed by exact Order ID and registered mobile number",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Composite tracking ID (orderNumber_phone10)" },
+        "orderNumber": { "type": "string", "description": "Human-readable order sequence ID" },
+        "phoneLast4": { "type": "string", "description": "Last 4 digits of phone number for verification" },
+        "createdAt": { "type": "string", "description": "Order creation ISO timestamp" },
+        "productId": { "type": "string", "description": "Purchased product ID" },
+        "productName": { "type": "string", "description": "Purchased product name" },
+        "productWeight": { "type": "string", "description": "Package weight of the item" },
+        "quantity": { "type": "number", "description": "Purchased quantity" },
+        "unitPrice": { "type": "number", "description": "Unit price in INR" },
+        "deliveryCharge": { "type": "number", "description": "Delivery charge in INR" },
+        "totalAmount": { "type": "number", "description": "Total payable amount in INR" },
+        "paymentMethod": { "type": "string", "enum": ["upi", "cod"], "description": "Selected payment method" },
+        "paymentStatus": { "type": "string", "enum": ["Pending", "Verification Required", "Paid / Verified", "Failed", "Refunded", "COD Pending", "COD Collected"], "description": "Payment verification status" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"], "description": "Fulfillment status" },
+        "courierName": { "type": "string", "description": "Courier company name" },
+        "trackingNumber": { "type": "string", "description": "AWB / courier tracking number" },
+        "trackingUrl": { "type": "string", "description": "Direct tracking web portal link" },
+        "estimatedDelivery": { "type": "string", "description": "Estimated delivery date text" },
+        "statusNotes": { "type": "string", "description": "Status updates or courier remarks" }
+      },
+      "required": ["id", "orderNumber", "createdAt", "productName", "quantity", "totalAmount", "paymentMethod", "status"]
     }
   },
   "firestore": {
@@ -105,6 +139,10 @@
     "/orders/{orderId}": {
       "schema": { "$ref": "#/entities/Order" },
       "description": "Customer order records"
+    },
+    "/orderTracking/{trackingId}": {
+      "schema": { "$ref": "#/entities/OrderTracking" },
+      "description": "Sanitized customer order tracking records"
     },
     "/feedbacks/{feedbackId}": {
       "schema": { "$ref": "#/entities/Feedback" },

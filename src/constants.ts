@@ -5,6 +5,8 @@ export const DEFAULT_PRODUCT: Product = {
   id: 'maknuts-makhana-jumbo-250g',
   name: 'Maknuts Makhana',
   tagline: '100% Premium Bihar Fox Nuts · Handpicked Jumbo Grade',
+  sku: 'MK-JUMBO-250',
+  category: 'Raw Phool Makhana',
   price: 299,
   originalPrice: 399,
   weight: '250g Pouch',
@@ -18,8 +20,13 @@ export const DEFAULT_PRODUCT: Product = {
     'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80'
   ],
   inStock: true,
+  stockCount: 150,
+  minQuantity: 1,
+  maxQuantity: 20,
   stockStatusText: 'In Stock - Ready to Dispatch',
   badge: 'Premium Handpicked',
+  isFeatured: true,
+  isBestseller: true,
   highlights: [
     '100% Pure & Naturally Roasted',
     'Rich in Plant-Based Protein & Calcium',
@@ -38,6 +45,13 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   bannerVisible: true,
   deliveryCharge: 40,
   freeDeliveryThreshold: 600,
+  freeDeliveryAllOrders: false,
+  discountEnabled: false,
+  discountType: 'percentage',
+  discountValue: 0,
+  minOrderQuantity: 1,
+  maxOrderQuantity: 20,
+  orderIdPrefix: 'MK',
   upiId: '7504805846@ibl',
   upiPayeeName: 'Maknuts Makhana',
   enableUpi: true,
@@ -47,7 +61,6 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   supportEmail: 'maknutsmakhana@gmail.com',
   address: 'Maknuts Agri Foods, Darbhanga, Bihar, India - 846004',
   supportHours: 'Mon - Sun: 9:00 AM - 9:00 PM',
-  adminPassword: 'maknuts123',
   trustBadges: ['Jumbo Grade', 'Sun-Dried & Roasted', 'Zero Trans Fat'],
   buttons: {
     buyNow: 'Buy Now',
@@ -96,7 +109,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   reviewsSection: {
     title: 'Customer Reviews & Feedback',
     subtitle: 'Real reviews and feedback from happy customers across India who snack on Maknuts.',
-    ratingText: '4.9 / 5.0',
+    ratingText: '',
     guaranteeBadge: '100% Satisfaction or Easy Replacement',
     reviews: [
       {
@@ -105,7 +118,10 @@ export const DEFAULT_SETTINGS: StoreSettings = {
         location: 'Bangalore',
         rating: 5,
         category: 'Taste & Crunch Quality',
-        comment: 'The size of the makhanas is truly jumbo! No burnt pieces, super crunchy, and lightly salted taste is pure perfection for my daily evening snack.'
+        comment: 'The size of the makhanas is truly jumbo! No burnt pieces, super crunchy, and lightly salted taste is pure perfection for my daily evening snack.',
+        status: 'approved',
+        verifiedBuyer: true,
+        createdAt: '2026-09-15T10:00:00.000Z'
       },
       {
         id: 'r-2',
@@ -113,7 +129,10 @@ export const DEFAULT_SETTINGS: StoreSettings = {
         location: 'New Delhi',
         rating: 5,
         category: 'Delivery & Shipping Speed',
-        comment: 'Ordering on WhatsApp was surprisingly fast and effortless. Sent the message, paid via UPI, and got courier tracking the next day. Top quality.'
+        comment: 'Ordering on WhatsApp was surprisingly fast and effortless. Sent the message, paid via UPI, and got courier tracking the next day. Top quality.',
+        status: 'approved',
+        verifiedBuyer: true,
+        createdAt: '2026-09-22T14:30:00.000Z'
       },
       {
         id: 'r-3',
@@ -121,7 +140,10 @@ export const DEFAULT_SETTINGS: StoreSettings = {
         location: 'Patna',
         rating: 5,
         category: 'Packaging & Seal',
-        comment: "Best makhana I've tasted in months. You can feel the freshness right after opening the zipper seal. My parents love having it with their morning tea."
+        comment: "Best makhana I've tasted in months. You can feel the freshness right after opening the zipper seal. My parents love having it with their morning tea.",
+        status: 'approved',
+        verifiedBuyer: true,
+        createdAt: '2026-10-01T09:15:00.000Z'
       }
     ]
   },
@@ -188,6 +210,199 @@ export const DEFAULT_SETTINGS: StoreSettings = {
 1. Shipping Coverage: We deliver across pan-India to all serviceable postal PIN codes.
 2. Dispatch Timeline: Orders placed before 2:00 PM are processed same day or next business morning.
 3. Tracking: Courier tracking link is shared with you on WhatsApp once the shipment is handed to the courier.
-4. Standard Delivery Time: 3-5 days for metro cities, 5-7 days for rest of India.`
-  }
+4. Standard Delivery Time: 3-5 days for metro cities, 5-7 days for rest of India.`,
+    cancellation: `ORDER CANCELLATION POLICY - MAKNUTS MAKHANA
+
+1. Order Cancellation Window: You can cancel your order within 6 hours of placement or before dispatch by messaging our WhatsApp support (+91 78010 51792) with your Order ID.
+2. Orders Already Dispatched: Once handed over to the courier partner, an order cannot be cancelled in transit. You may refuse delivery at the doorstep for COD orders or contact us for return verification.
+3. Prepaid Refunds: For cancelled orders paid via UPI, full refund is credited back to your original source account within 2-3 business days.`
+  },
+  sectionVisibility: {
+    announcementBar: true,
+    headerNavigation: true,
+    heroBanner: true,
+    promoBanner: true,
+    productShowcase: true,
+    benefitsSection: true,
+    foodCompliance: true,
+    gallerySection: true,
+    reviewsSection: true,
+    faqSection: true,
+    aboutSection: true,
+    contactSection: true,
+    floatingWhatsApp: true,
+    footer: true,
+  },
+  sectionOrder: [
+    'announcementBar',
+    'headerNavigation',
+    'heroBanner',
+    'promoBanner',
+    'productShowcase',
+    'foodCompliance',
+    'benefitsSection',
+    'gallerySection',
+    'reviewsSection',
+    'faqSection',
+    'footer'
+  ],
+  heroSection: {
+    badge: '100% Mithila Origin · Direct Farm Harvest',
+    heading: 'Crisp, Fluffy & Pure Jumbo Makhana',
+    subheading: 'Direct from the pristine freshwater ponds of Darbhanga, Bihar. Handpicked 6+ Sutta grade fox nuts, slow-roasted to golden crunch perfection.',
+    primaryCtaText: 'Shop Fresh Harvest',
+    secondaryCtaText: 'Quick WhatsApp Order',
+    bannerImage: defaultProductImage,
+    trustChips: ['Farm Direct', 'No Preservatives', 'Zero Trans Fat', 'Rich in Protein'],
+    showCtaButtons: true,
+  },
+  promoBanner: {
+    enabled: true,
+    badge: 'FESTIVE OFFER',
+    title: 'Flat ₹50 OFF on Orders Above ₹499',
+    description: 'Use coupon code MAKNUTS50 during checkout or mention on WhatsApp to get instant savings!',
+    couponCodeBadge: 'MAKNUTS50',
+    bgColor: 'emerald',
+  },
+  coupons: [
+    {
+      id: 'c-welcome10',
+      code: 'WELCOME10',
+      discountType: 'percentage',
+      discountValue: 10,
+      minOrderValue: 250,
+      maxDiscount: 100,
+      usageLimit: 500,
+      usedCount: 0,
+      perCustomerLimit: 1,
+      enabled: true,
+      firstOrderOnly: true,
+      description: '10% off on your first order (Max ₹100)'
+    },
+    {
+      id: 'c-maknuts50',
+      code: 'MAKNUTS50',
+      discountType: 'fixed',
+      discountValue: 50,
+      minOrderValue: 499,
+      usageLimit: 1000,
+      usedCount: 0,
+      perCustomerLimit: 2,
+      enabled: true,
+      firstOrderOnly: false,
+      description: 'Flat ₹50 off on orders of ₹499 and above'
+    },
+    {
+      id: 'c-freeship',
+      code: 'FREESHIP',
+      discountType: 'free_delivery',
+      discountValue: 0,
+      minOrderValue: 300,
+      usageLimit: 1000,
+      usedCount: 0,
+      perCustomerLimit: 3,
+      enabled: true,
+      firstOrderOnly: false,
+      description: 'Free pan-India delivery on orders of ₹300 and above'
+    }
+  ],
+  foodCompliance: {
+    enabled: true,
+    fssaiNumber: '10424000000892',
+    ingredients: '100% Pure Raw Lotus Seeds (Fox Nuts / Phool Makhana / Euryale Ferox). No artificial additives, no bleaching agents, no synthetic coloring.',
+    allergens: 'Packed in a dedicated vegetarian dry food facility. Contains Lotus seeds (Fox Nuts). May contain traces of tree nuts and sesame.',
+    isVeg: true,
+    netQuantity: '250 g (When Packed)',
+    shelfLife: '12 Months from Packaging Date',
+    storageInstructions: 'Store in a cool, hygienic and dry place away from direct sunlight. Once opened, transfer to an airtight container to preserve crisp crunchiness.',
+    servingInstructions: 'Ready-to-eat guilt-free snack. Can also be roasted gently on low flame with a spoonful of pure A2 desi ghee and rock salt / black pepper.',
+    countryOfOrigin: 'India',
+    manufacturerName: 'Maknuts Agri Foods & Natural Farms',
+    manufacturerAddress: 'Village Bahadurpur, Post Bahadurpur, Darbhanga District, Bihar, India - 846001',
+    packerName: 'Maknuts Agro Packaging Unit',
+    packerAddress: 'Industrial Estate, Donar, Darbhanga, Bihar, India - 846004',
+    marketerName: 'Maknuts Superfoods India',
+    marketerAddress: 'Maknuts Agri Foods, Darbhanga, Bihar, India - 846004',
+    customerCarePhone: '+91 78010 51792',
+    customerCareEmail: 'maknutsmakhana@gmail.com',
+    customerCareAddress: 'Customer Support Desk, Maknuts Agri Foods, Darbhanga, Bihar - 846004',
+    batchLotFormat: 'MK-BH-2026-LOT',
+    otherLegalDetails: 'FSSAI Lic. No. 10424000000892. Proprietary Food - Nuts and Seeds. Packed in food-grade, multi-layer moisture-barrier zipper pouch.',
+    nutrition: {
+      servingSize: '100 g',
+      energy: '347 kcal',
+      protein: '9.7 g',
+      carbohydrates: '76.9 g',
+      sugar: '0.0 g',
+      addedSugar: '0.0 g',
+      fat: '0.1 g',
+      saturatedFat: '0.0 g',
+      transFat: '0.0 g',
+      sodium: '2.0 mg',
+      cholesterol: '0.0 mg',
+      dietaryFiber: '14.5 g',
+      calcium: '60.0 mg',
+      iron: '1.4 mg',
+    },
+    claims: {
+      highProtein: true,
+      glutenFree: true,
+      noPreservatives: true,
+      zeroTransFat: true,
+      noAddedSugar: true,
+      natural100: true,
+      customClaims: ['Direct Mithila Harvest', 'Jumbo 6+ Sutta Grade', 'Low Glycemic Index']
+    }
+  },
+  faqs: [
+    {
+      id: 'faq-1',
+      question: 'Where is Maknuts Makhana sourced from?',
+      answer: 'All our Makhanas are harvested directly from traditional wetland ponds in the Mithila region (Darbhanga & Madhubani) of Bihar, known worldwide for producing the finest grade lotus seeds.'
+    },
+    {
+      id: 'faq-2',
+      question: 'How are Maknuts Makhanas graded and processed?',
+      answer: 'We exclusively select Jumbo 6+ Sutta grade seeds. They are sun-dried, hand-popped by traditional artisans, and slow-roasted in small batches to preserve optimal crunch and nutrients without chemical bleaching.'
+    },
+    {
+      id: 'faq-3',
+      question: 'How do I pay and track my order?',
+      answer: 'You can pay securely via instant UPI QR code or choose Cash on Delivery (COD). You receive an Order ID instantly, and can track your parcel live on our website or get courier updates directly on WhatsApp.'
+    },
+    {
+      id: 'faq-4',
+      question: 'What is the shelf life and packaging?',
+      answer: 'Our Makhanas have a 12-month shelf life. They are sealed in multi-layer moisture-lock zipper standee pouches so they stay fresh and crunchy even after unsealing.'
+    }
+  ],
+  seo: {
+    pageTitle: 'Maknuts Makhana — 100% Pure Jumbo Fox Nuts from Bihar',
+    metaDescription: 'Buy fresh, crispy Jumbo Grade Phool Makhana online direct from Mithila, Bihar farms. High protein, gluten-free, zero trans fat. Fast pan-India delivery & COD.',
+    keywords: 'Maknuts, Makhana, Phool Makhana, Fox Nuts, Lotus Seeds, Bihar Makhana, Mithila Makhana, Healthy Snacks, High Protein Snack, Roasted Makhana',
+    socialShareTitle: 'Maknuts Makhana — Handpicked Bihar Superfood Snack',
+    socialShareImage: defaultProductImage,
+    productSeoTitle: 'Maknuts Jumbo Grade Fox Nuts 250g Pouch',
+    productDescription: 'Naturally roasted jumbo lotus seeds handpicked from Bihar wetlands. Crunchy, protein-rich, zero preservatives.',
+    imageAltText: 'Maknuts Premium Jumbo Grade Makhana Pouch',
+  },
+  whatsAppSettings: {
+    phoneNumber: '+91 78010 51792',
+    orderMessageTemplate: 'Hello Maknuts! I would like to order {product_name} ({quantity} pack, Total: ₹{total}). My Delivery Address: {address}, PIN: {pincode}.',
+    paymentConfirmationTemplate: 'Hello {customer_name}! We have received your payment of ₹{amount} for Order #{order_id}. Your shipment is being prepared for dispatch.',
+    supportMessageTemplate: 'Hello {customer_name}! Thank you for contacting Maknuts Support. How can we help you today?',
+    enableFloatingButton: true,
+  },
+  socialLinks: {
+    instagram: 'https://instagram.com/maknutsmakhana',
+    facebook: 'https://facebook.com/maknutsmakhana',
+    youtube: '',
+    twitter: '',
+  },
+  mediaLibrary: [
+    { id: 'm-logo', url: defaultProductImage, label: 'Default Maknuts Logo', tag: 'logo' },
+    { id: 'm-hero-1', url: defaultProductImage, label: 'Makhana Pouch Standee', tag: 'hero' },
+    { id: 'm-bowl', url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80', label: 'Crisp Roasted Bowl', tag: 'product' },
+    { id: 'm-farm', url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=80', label: 'Wetland Harvest Pond', tag: 'gallery' },
+  ]
 };

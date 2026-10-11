@@ -20,7 +20,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTracking }) => {
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
           <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl overflow-hidden shadow-md shadow-emerald-900/15 border border-emerald-700/30 shrink-0 bg-emerald-950 flex items-center justify-center p-0.5">
             <img
-              src={maknutsLogo}
+              src={storeSettings.logoUrl || maknutsLogo}
               alt={storeSettings.shopName || 'Maknuts Logo'}
               className="w-full h-full object-cover rounded-[10px]"
               referrerPolicy="no-referrer"

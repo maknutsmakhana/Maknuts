@@ -11,6 +11,7 @@ export function formatWhatsAppNumber(phone: string): string {
 }
 
 export function generateOrderWhatsAppMessage(order: Order, shopName: string = 'Maknuts'): string {
+  const isUpi = order.paymentMethod === 'upi';
   const lines = [
     `🌿 *NEW ORDER - ${shopName.toUpperCase()}* 🌿`,
     `━━━━━━━━━━━━━━━━━━━━━━`,
@@ -25,21 +26,32 @@ export function generateOrderWhatsAppMessage(order: Order, shopName: string = 'M
     ``,
     `🛒 *ORDER DETAILS:*`,
     `• *Product:* ${order.productName} (${order.productWeight})`,
-    `• *Quantity:* ${order.quantity}`,
     `• *Unit Price:* ₹${order.unitPrice}`,
+    `• *Quantity:* ${order.quantity}`,
+    `• *Base Amount:* ₹${order.baseAmount ?? (order.unitPrice * order.quantity)}`,
+    ...(order.discountAmount && order.discountAmount > 0 
+      ? [`• *Discount:* -₹${order.discountAmount}${order.discountType === 'percentage' && order.discountValue ? ` (${order.discountValue}% OFF)` : ''}`]
+      : []),
     `• *Subtotal:* ₹${order.subtotal}`,
-    `• *Delivery Charge:* ${order.deliveryCharge === 0 ? 'FREE' : `₹${order.deliveryCharge}`}`,
-    `💰 *TOTAL AMOUNT:* ₹${order.totalAmount}`,
+    `• *Delivery Charge:* ${order.deliveryCharge === 0 ? 'FREE (₹0)' : `₹${order.deliveryCharge}`}`,
+    `💰 *FINAL PAYABLE AMOUNT:* ₹${order.totalAmount}`,
     ``,
-    `💳 *PAYMENT METHOD:* ${order.paymentMethod === 'upi' ? 'Manual UPI' : 'Cash on Delivery (COD)'}`,
+    `💳 *PAYMENT METHOD:* ${isUpi ? 'UPI' : 'Cash on Delivery'}`,
   ];
 
-  if (order.paymentMethod === 'upi' && order.upiRefNumber) {
-    lines.push(`📝 *UPI UTR / Ref No:* ${order.upiRefNumber}`);
-  }
-
-  if (order.paymentScreenshot) {
-    lines.push(`📎 *Payment Screenshot:* (Attached / Ready to share in chat)`);
+  if (isUpi) {
+    if (order.upiRefNumber && order.upiRefNumber.trim()) {
+      lines.push(`📝 *UPI Transaction ID / UTR:* ${order.upiRefNumber.trim()}`);
+    }
+    lines.push(
+      ``,
+      `📸 *Payment Verification:* Please verify my payment. I will send my payment screenshot here in this chat for verification.`
+    );
+  } else {
+    lines.push(
+      ``,
+      `💵 *Payment on Delivery:* Please collect ₹${order.totalAmount} in cash when order is delivered.`
+    );
   }
 
   if (order.note && order.note.trim()) {

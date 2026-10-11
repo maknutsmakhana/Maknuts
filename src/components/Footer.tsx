@@ -28,7 +28,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpe
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg overflow-hidden border border-emerald-800/40 shrink-0 bg-emerald-950 flex items-center justify-center p-0.5 shadow-xs">
                 <img
-                  src={maknutsLogo}
+                  src={storeSettings.logoUrl || maknutsLogo}
                   alt={storeSettings.shopName || 'Maknuts Logo'}
                   className="w-full h-full object-cover rounded-md"
                   referrerPolicy="no-referrer"

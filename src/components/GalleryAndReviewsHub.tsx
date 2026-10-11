@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Camera, Star, X, ChevronLeft, ChevronRight, Award, MessageSquareHeart, CheckCircle2 } from 'lucide-react';
+import { Camera, Star, X, ChevronLeft, ChevronRight, Award, MessageSquareHeart, CheckCircle2, Store } from 'lucide-react';
+import { calculateReviewStats } from '../utils/reviews';
 
 interface GalleryAndReviewsHubProps {
   onOpenFeedback: () => void;
 }
 
 export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOpenFeedback }) => {
-  const { storeSettings } = useStore();
+  const { storeSettings, reviews } = useStore();
 
   const gallery = storeSettings.gallerySection || {
     title: 'Our Purity in Pictures',
@@ -17,13 +18,16 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
   const photos = gallery.photos || [];
 
   const reviewsSection = storeSettings.reviewsSection || {
-    title: 'Loved by Customers Across India',
-    subtitle: 'Genuine verified feedback from makhana lovers.',
-    ratingText: '4.9 / 5.0',
+    title: 'Customer Reviews & Feedback',
+    subtitle: 'Genuine verified feedback from makhana lovers across India.',
+    ratingText: '',
     guaranteeBadge: '100% Quality Guaranteed',
     reviews: []
   };
-  const reviews = reviewsSection.reviews || [];
+
+  // Requirement 2 & 8 & 9: Only APPROVED reviews appear publicly and calculate ratings
+  const approvedReviews = (reviews || []).filter(r => (r.status || 'approved') === 'approved');
+  const reviewStats = calculateReviewStats(approvedReviews);
 
   // Modals state
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -84,7 +88,11 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
             </span>
           </div>
           <span className="text-[10px] sm:text-xs text-stone-500 font-medium truncate max-w-[140px] sm:max-w-none">
-            ★ {reviewsSection.ratingText || '4.9/5.0'} · ({reviews.length} Reviews)
+            {reviewStats.hasReviews ? (
+              <>★ {reviewStats.averageRating.toFixed(1)} / 5.0 · ({reviewStats.totalReviews} {reviewStats.totalReviews === 1 ? 'Review' : 'Reviews'})</>
+            ) : (
+              'No reviews yet.'
+            )}
           </span>
         </button>
       </div>
@@ -267,11 +275,11 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-amber-600">
-                      ★ {reviewsSection.ratingText || '4.9 / 5.0'}
+                      {reviewStats.hasReviews ? `★ ${reviewStats.averageRating.toFixed(1)} / 5.0` : 'No reviews yet.'}
                     </span>
                     <span className="text-[11px] text-stone-400">•</span>
                     <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                      {reviews.length} Verified Reviews
+                      {reviewStats.totalReviews} {reviewStats.totalReviews === 1 ? 'Approved Review' : 'Approved Reviews'}
                     </span>
                   </div>
                   <h2 className="text-base sm:text-lg font-bold text-emerald-950 font-serif leading-tight">
@@ -304,22 +312,44 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
             </div>
 
             {/* Reviews Summary Banner */}
-            <div className="px-5 py-3 bg-emerald-950 text-white flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="flex text-amber-300 gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
-                  ))}
-                </div>
-                <span className="font-bold text-amber-200">
-                  {reviewsSection.ratingText || '4.9 / 5.0 Rating'}
-                </span>
-                <span className="text-stone-300 hidden sm:inline">
-                  — 100% Bihar Harvest Quality
-                </span>
+            <div className="px-5 py-3.5 bg-emerald-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {reviewStats.hasReviews ? (
+                  <>
+                    <div className="flex text-amber-300 gap-0.5">
+                      {[...Array(Math.max(1, Math.min(5, Math.round(reviewStats.averageRating))))].map((_, i) => (
+                        <Star key={i} className="w-3.5 h-3.5 fill-amber-400 stroke-amber-400" />
+                      ))}
+                    </div>
+                    <span className="font-bold text-amber-200">
+                      {reviewStats.averageRating.toFixed(1)} / 5.0 Rating
+                    </span>
+                    <span className="text-stone-300 text-[11px] hidden sm:inline">
+                      — 100% Bihar Harvest Quality
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-semibold text-amber-200">
+                    No reviews yet.
+                  </span>
+                )}
               </div>
+
+              {/* Star Breakdown Summary */}
+              {reviewStats.hasReviews && (
+                <div className="flex items-center gap-2 text-[10px] text-stone-300 overflow-x-auto py-0.5">
+                  <span className="text-amber-300 font-bold">5★: {reviewStats.starCounts[5]}</span>
+                  <span>•</span>
+                  <span>4★: {reviewStats.starCounts[4]}</span>
+                  <span>•</span>
+                  <span>3★: {reviewStats.starCounts[3]}</span>
+                  {reviewStats.starCounts[2] > 0 && <><span>•</span><span>2★: {reviewStats.starCounts[2]}</span></>}
+                  {reviewStats.starCounts[1] > 0 && <><span>•</span><span>1★: {reviewStats.starCounts[1]}</span></>}
+                </div>
+              )}
+
               {reviewsSection.guaranteeBadge && (
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-200 bg-emerald-900/70 px-2.5 py-0.5 rounded-full border border-emerald-700/50">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-200 bg-emerald-900/70 px-2.5 py-0.5 rounded-full border border-emerald-700/50 shrink-0">
                   <Award className="w-3 h-3 text-amber-300" />
                   <span>{reviewsSection.guaranteeBadge}</span>
                 </div>
@@ -328,19 +358,20 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
 
             {/* Scrollable Reviews Grid */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-              {reviews.length === 0 ? (
-                <div className="text-center py-12 text-stone-400 text-sm">
-                  No customer reviews yet. Be the first to share your experience!
+              {approvedReviews.length === 0 ? (
+                <div className="text-center py-12 text-stone-400 text-sm space-y-2">
+                  <p className="font-semibold text-stone-500">No reviews yet.</p>
+                  <p className="text-xs">Be the first to share your honest thoughts on Maknuts crunch and quality!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 sm:gap-4 text-xs">
-                  {reviews.map((review, idx) => (
+                  {approvedReviews.map((review, idx) => (
                     <div 
                       key={review.id || idx} 
                       className="bg-[#FAF8F5] p-4 rounded-2xl border border-stone-200/90 space-y-3 flex flex-col justify-between shadow-2xs hover:shadow-xs transition-shadow"
                     >
                       <div>
-                        {/* Rating Stars */}
+                        {/* Rating Stars & Date */}
                         <div className="flex items-center justify-between gap-1 mb-2">
                           <div className="flex text-amber-500 gap-0.5">
                             {[...Array(review.rating || 5)].map((_, i) => (
@@ -349,7 +380,11 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
                           </div>
                           {review.createdAt && (
                             <span className="text-[10px] text-stone-400">
-                              {new Date(review.createdAt).toLocaleDateString()}
+                              {new Date(review.createdAt).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
                             </span>
                           )}
                         </div>
@@ -370,17 +405,43 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
                             />
                           </div>
                         )}
+
+                        {/* Store Reply if admin responded */}
+                        {review.storeReply && (
+                          <div className="mt-2.5 p-2.5 bg-emerald-50/70 rounded-xl border border-emerald-200/80 text-[11px] space-y-1">
+                            <div className="flex items-center justify-between text-emerald-950 font-bold">
+                              <span className="flex items-center gap-1 text-emerald-800">
+                                <Store className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>Maknuts Store Reply</span>
+                              </span>
+                              {review.storeReplyAt && (
+                                <span className="text-[10px] font-normal text-stone-400">
+                                  {new Date(review.storeReplyAt).toLocaleDateString('en-IN', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-stone-700 italic">
+                              "{review.storeReply}"
+                            </p>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Author & Verified Tag */}
+                      {/* Author & Verified Tag (Only when genuinely verified) */}
                       <div className="font-bold text-stone-900 pt-2 border-t border-stone-200/70 flex items-center justify-between text-[11px]">
                         <span className="truncate pr-2">
                           — {review.name}{review.location ? `, ${review.location}` : ''}
                         </span>
-                        <span className="inline-flex items-center gap-1 text-emerald-800 font-bold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded shrink-0 border border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>Verified</span>
-                        </span>
+                        {review.verifiedBuyer && (
+                          <span className="inline-flex items-center gap-1 text-emerald-800 font-bold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0 border border-emerald-200" title="Genuine verified customer order delivered">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Verified Buyer</span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

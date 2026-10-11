@@ -7,7 +7,11 @@ service cloud.firestore {
       return id is string && id.size() > 0 && id.size() <= 128;
     }
 
-    // Default deny
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    // Default deny all unknown paths
     match /{document=**} {
       allow read, write: if false;
     }
@@ -17,28 +21,72 @@ service cloud.firestore {
       allow read: if true;
     }
 
-    // Products catalog: anyone can read (get & list), write validated by id
+    // Products catalog:
+    // Anyone can read (get & list) products
+    // Only authenticated admin can create, update, or delete products
     match /products/{productId} {
       allow get, list: if true;
-      allow create, update, delete: if isValidId(productId);
+      allow create, update, delete: if isAdmin() && isValidId(productId);
     }
 
-    // Store settings (e.g. settings/store)
+    // Store settings (e.g. settings/store):
+    // Public users can read store settings document (get)
+    // Only authenticated admin can list, create, update, or delete settings
     match /settings/{settingId} {
-      allow get, list: if true;
-      allow create, update, delete: if isValidId(settingId);
+      allow get: if true;
+      allow list, create, update, delete: if isAdmin() && isValidId(settingId);
     }
 
-    // Customer orders: allow reading and creating orders, write validated by id
+    // Customer orders:
+    // Anyone can create an order during checkout with a valid ID
+    // Customers CANNOT list/read the complete orders collection, cannot modify or delete orders
+    // Requirement 8: Customers must NOT be able to set Paid, Verified, Failed, Refunded, or COD Collected
+    // Requirement 3: Customers cannot store screenshot image blobs inside order documents
+    // Only authenticated admin can read all orders (get & list), update status/payment/tracking, or delete orders
     match /orders/{orderId} {
-      allow get, list: if true;
-      allow create, update, delete: if isValidId(orderId);
+      allow create: if isValidId(orderId) && (
+        isAdmin() || (
+          request.resource.data.paymentStatus in ['Pending', 'COD Pending'] &&
+          request.resource.data.status == 'Pending' &&
+          request.resource.data.paymentMethod in ['upi', 'cod'] &&
+          (!('paymentScreenshot' in request.resource.data) || request.resource.data.paymentScreenshot == '' || request.resource.data.paymentScreenshot == null)
+        )
+      );
+      allow get, list, update, delete: if isAdmin();
     }
 
-    // Customer feedbacks: anyone can create/read feedbacks, write validated by id
+    // Customer Order Tracking:
+    // Direct single-document get requiring exact Order ID and 10-digit mobile number composite ID
+    // Customers CANNOT list/scrape the tracking collection
+    // Customers CANNOT update or delete tracking data
+    // Admin can list, create, update, delete tracking records
+    match /orderTracking/{trackingId} {
+      allow get: if isValidId(trackingId);
+      allow list: if isAdmin();
+      allow create: if isValidId(trackingId) && (
+        isAdmin() || (
+          request.resource.data.paymentStatus in ['Pending', 'COD Pending'] &&
+          request.resource.data.status == 'Pending'
+        )
+      );
+      allow update, delete: if isAdmin() && isValidId(trackingId);
+    }
+
+    // Customer reviews & feedbacks:
+    // Public users can only read approved reviews
+    // Anyone can submit new review with pending status and valid ID
+    // Public users cannot set verifiedBuyer to true
+    // Only authenticated admin can read pending/rejected, update, approve, or delete reviews
     match /feedbacks/{feedbackId} {
-      allow get, list: if true;
-      allow create, update, delete: if isValidId(feedbackId);
+      allow get: if resource.data.status == 'approved' || isAdmin();
+      allow list: if resource.data.status == 'approved' || isAdmin();
+      allow create: if isValidId(feedbackId) && (
+        isAdmin() || (
+          request.resource.data.status == 'pending' &&
+          (!('verifiedBuyer' in request.resource.data) || request.resource.data.verifiedBuyer == false)
+        )
+      );
+      allow update, delete: if isAdmin() && isValidId(feedbackId);
     }
   }
 }
