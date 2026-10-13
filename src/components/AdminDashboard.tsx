@@ -34,12 +34,6 @@ import { calculateOrderPricing, round2, validatePriceInput } from '../utils/pric
 import { calculateReviewStats } from '../utils/reviews';
 import maknutsLogo from '../assets/images/regenerated_image_1791357700332.png';
 
-const SAMPLE_MAKHANA_PHOTOS = [
-  { label: 'Crispy Roasted Bowl', url: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?auto=format&fit=crop&q=80&w=800' },
-  { label: 'White Jumbo Seeds', url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=800' },
-  { label: 'Moisture Stand Pouch', url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=800' },
-  { label: 'Lotus Pond Harvest', url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=800' },
-];
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -1225,14 +1219,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     onSaveSettings={async (updated) => {
                       await updateSettings(updated);
                     }}
-                    onAddGalleryPhoto={async (url, caption) => {
+                    onAddGalleryPhoto={async (url, caption, tag) => {
                       await addGalleryPhoto({
                         id: 'gal-' + Date.now(),
                         url,
                         caption,
-                        tag: 'Store Photo',
+                        tag: tag || 'Store Photo',
                         createdAt: new Date().toISOString(),
                       });
+                      triggerReviewToast('Photo added to media successfully!', 'success');
+                    }}
+                    onDeleteGalleryPhoto={async (photoId, index) => {
+                      await deleteGalleryPhoto(photoId, index);
+                      triggerReviewToast('Photo removed from media.', 'info');
                     }}
                   />
                 )}
@@ -1614,28 +1613,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               </button>
                             </div>
 
-                            {/* Quick Add Sample Makhana Photos */}
-                            <div className="bg-stone-100/80 p-2.5 rounded-xl border border-stone-200/70">
-                              <div className="text-[11px] font-bold text-stone-600 mb-1.5 flex items-center gap-1">
-                                <Sparkles className="w-3 h-3 text-amber-600" />
-                                <span>Quick Samples (1-Click Add):</span>
-                              </div>
-                              <div className="flex items-center gap-2 overflow-x-auto py-1">
-                                {SAMPLE_MAKHANA_PHOTOS.map((sample, idx) => (
-                                  <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => handleAddProductPhotoUrl(sample.url)}
-                                    className="group flex items-center gap-1.5 px-2 py-1 bg-white hover:bg-emerald-50 rounded-lg border border-stone-200 hover:border-emerald-500 text-[11px] font-medium text-stone-700 transition-all shrink-0 cursor-pointer shadow-2xs"
-                                    title="Click to add photo to product gallery"
-                                  >
-                                    <img src={sample.url} alt="" className="w-5 h-5 rounded object-cover" />
-                                    <span>{sample.label}</span>
-                                    <Plus className="w-3 h-3 text-emerald-700 group-hover:scale-125 transition-transform" />
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
 
                             {/* Product Photos Gallery Thumbnails */}
                             {(editingProduct.images && editingProduct.images.length > 0) && (
