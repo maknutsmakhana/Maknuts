@@ -36,15 +36,28 @@ export const AdminWhatsAppTab: React.FC<AdminWhatsAppTabProps> = ({
   const [saveToast, setSaveToast] = useState(false);
   const [testUrl, setTestUrl] = useState('');
 
+  const isFloatingEnabled = 
+    waSettings.enableFloatingButton !== false && 
+    waSettings.enabled !== false && 
+    settings.sectionVisibility?.floatingWhatsApp !== false;
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
       const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const willBeEnabled = waSettings.enableFloatingButton !== false && waSettings.enabled !== false;
       await onSaveSettings({
         whatsappNumber: cleanPhone,
         whatsAppSettings: {
           ...waSettings,
           businessNumber: cleanPhone,
+          phoneNumber: cleanPhone,
+          enabled: willBeEnabled,
+          enableFloatingButton: willBeEnabled,
+        },
+        sectionVisibility: {
+          ...(settings.sectionVisibility || {}),
+          floatingWhatsApp: willBeEnabled,
         }
       });
       setSaveToast(true);
@@ -125,17 +138,47 @@ export const AdminWhatsAppTab: React.FC<AdminWhatsAppTabProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center justify-between p-3.5 bg-stone-50 rounded-xl border border-stone-200">
-            <div>
-              <span className="text-xs font-bold text-stone-900 block">Floating WhatsApp Button</span>
-              <p className="text-[11px] text-stone-500">Display corner chat bubble on storefront</p>
+          <div className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-stone-900 block">
+                  "Order on WhatsApp" Button (Home Bottom-Right)
+                </span>
+                <p className="text-[11px] text-stone-500">
+                  Show or hide the floating quick-order WhatsApp button on the storefront bottom-right
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isFloatingEnabled}
+                  onChange={e => {
+                    const nextVal = e.target.checked;
+                    setWaSettings({ 
+                      ...waSettings, 
+                      enabled: nextVal, 
+                      enableFloatingButton: nextVal 
+                    });
+                  }}
+                  className="w-5 h-5 accent-emerald-800 rounded cursor-pointer"
+                />
+              </label>
             </div>
-            <input
-              type="checkbox"
-              checked={waSettings.enabled}
-              onChange={e => setWaSettings({ ...waSettings, enabled: e.target.checked })}
-              className="w-5 h-5 accent-emerald-800 rounded cursor-pointer"
-            />
+
+            {isFloatingEnabled && (
+              <div className="pt-2 border-t border-stone-200/60">
+                <label className="block text-[11px] font-bold text-stone-700 mb-1">
+                  Floating Button Tooltip Label
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Order on WhatsApp"
+                  value={waSettings.floatingButtonText || 'Order on WhatsApp'}
+                  onChange={e => setWaSettings({ ...waSettings, floatingButtonText: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-semibold text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

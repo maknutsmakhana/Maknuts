@@ -32,10 +32,10 @@ export const FaqSection: React.FC = () => {
           <span>Frequently Asked Questions</span>
         </div>
         <h2 className="text-xl sm:text-2xl font-extrabold text-emerald-950 font-serif">
-          Have Questions? We Have Answers.
+          {storeSettings.faqSectionTitle || 'Have Questions? We Have Answers.'}
         </h2>
         <p className="text-xs sm:text-sm text-stone-500 mt-1">
-          Everything you need to know about our sourcing, quality grades, delivery, and payment.
+          {storeSettings.faqSectionSubtitle || 'Everything you need to know about our sourcing, quality grades, delivery, and payment.'}
         </p>
       </div>
 

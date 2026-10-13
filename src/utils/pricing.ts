@@ -17,6 +17,7 @@ export interface PricingCalculationResult {
   discountValue: number;
   discountAmount: number; // general store discount deduction
   couponCode?: string;
+  couponType?: 'percentage' | 'fixed' | 'free_delivery';
   couponDiscount: number; // additional coupon discount deduction
   couponDescription?: string;
   subtotal: number; // baseAmount - general discount - coupon discount (>= 0)
@@ -32,6 +33,8 @@ export interface OrderPricingInput {
   quantity: number;
   settings: StoreSettings;
   appliedCoupon?: Coupon | null;
+  productId?: string;
+  customerPhone?: string;
 }
 
 export interface CouponValidationResult {
@@ -50,7 +53,8 @@ export function validateAndApplyCoupon(
   coupons: Coupon[] = [],
   baseAmount: number,
   productId?: string,
-  customerPhone?: string
+  customerPhone?: string,
+  existingOrders?: { phone: string; couponCode?: string; status?: string }[]
 ): CouponValidationResult {
   if (!code || !code.trim()) {
     return { isValid: false, discountAmount: 0, isFreeDelivery: false, errorMessage: 'Please enter a coupon code' };
@@ -64,7 +68,7 @@ export function validateAndApplyCoupon(
   }
 
   if (!coupon.enabled) {
-    return { isValid: false, discountAmount: 0, isFreeDelivery: false, errorMessage: `Coupon "${cleanCode}" is no longer active` };
+    return { isValid: false, discountAmount: 0, isFreeDelivery: false, errorMessage: `Coupon "${cleanCode}" is currently disabled` };
   }
 
   // Date validity check
@@ -94,19 +98,59 @@ export function validateAndApplyCoupon(
         isValid: false,
         discountAmount: 0,
         isFreeDelivery: false,
-        errorMessage: `Coupon "${cleanCode}" is not applicable on this product`
+        errorMessage: `Coupon "${cleanCode}" is not applicable to the selected product`
       };
     }
   }
 
-  // Usage limit check
+  // Total usage limit check
   if (coupon.usageLimit && (coupon.usedCount || 0) >= coupon.usageLimit) {
     return {
       isValid: false,
       discountAmount: 0,
       isFreeDelivery: false,
-      errorMessage: `Coupon "${cleanCode}" usage limit has been reached`
+      errorMessage: `Coupon "${cleanCode}" total usage limit has been reached`
     };
+  }
+
+  // First order only check
+  if (coupon.firstOrderOnly && customerPhone && existingOrders) {
+    const cleanPhone = customerPhone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length >= 10) {
+      const pastCustomerOrders = existingOrders.filter(o => 
+        o.phone.replace(/\D/g, '').slice(-10) === cleanPhone && 
+        o.status !== 'Cancelled'
+      );
+      if (pastCustomerOrders.length > 0) {
+        return {
+          isValid: false,
+          discountAmount: 0,
+          isFreeDelivery: false,
+          errorMessage: `Coupon "${cleanCode}" is valid for first-time customers only`
+        };
+      }
+    }
+  }
+
+  // Per-customer usage limit check
+  if (customerPhone && existingOrders) {
+    const cleanPhone = customerPhone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length >= 10) {
+      const customerUses = existingOrders.filter(o => 
+        o.phone.replace(/\D/g, '').slice(-10) === cleanPhone && 
+        o.couponCode?.trim().toUpperCase() === cleanCode && 
+        o.status !== 'Cancelled'
+      ).length;
+      const limit = coupon.perCustomerLimit || 1;
+      if (customerUses >= limit) {
+        return {
+          isValid: false,
+          discountAmount: 0,
+          isFreeDelivery: false,
+          errorMessage: `You have reached the maximum usage limit (${limit}) for coupon "${cleanCode}"`
+        };
+      }
+    }
   }
 
   // Calculate discount based on coupon type
@@ -123,8 +167,8 @@ export function validateAndApplyCoupon(
     discountAmount = 0;
   }
 
-  // Prevent discount making order negative
-  discountAmount = Math.min(discountAmount, baseAmount);
+  // Prevent discount from making order negative
+  discountAmount = Math.max(0, Math.min(discountAmount, baseAmount));
 
   return {
     isValid: true,
@@ -183,7 +227,9 @@ export function calculateOrderPricing(input: OrderPricingInput): PricingCalculat
     const couponValidation = validateAndApplyCoupon(
       appliedCoupon.code,
       [appliedCoupon],
-      Math.max(0, baseAmount - discountAmount)
+      Math.max(0, baseAmount - discountAmount),
+      input.productId,
+      input.customerPhone
     );
     if (couponValidation.isValid) {
       couponDiscount = couponValidation.discountAmount;
@@ -233,6 +279,7 @@ export function calculateOrderPricing(input: OrderPricingInput): PricingCalculat
     discountValue,
     discountAmount,
     couponCode,
+    couponType: appliedCoupon?.discountType,
     couponDiscount,
     couponDescription,
     subtotal,

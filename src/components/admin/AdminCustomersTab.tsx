@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Order } from '../../types';
+import { Order, StoreSettings } from '../../types';
 import { 
   Users, 
   Search, 
@@ -10,12 +10,15 @@ import {
   Download, 
   ExternalLink,
   ShoppingBag,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react';
 import { createWhatsAppUrl } from '../../utils/whatsapp';
+import { downloadCustomersReportPdf } from '../../utils/pdfGenerator';
 
 interface AdminCustomersTabProps {
   orders: Order[];
+  storeSettings?: StoreSettings;
   onOpenOrder: (order: Order) => void;
 }
 
@@ -33,6 +36,7 @@ interface CustomerProfile {
 
 export const AdminCustomersTab: React.FC<AdminCustomersTabProps> = ({
   orders,
+  storeSettings,
   onOpenOrder,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,14 +135,30 @@ export const AdminCustomersTab: React.FC<AdminCustomersTabProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleExportCustomersCsv}
-          className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export Customers CSV</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              if (storeSettings) {
+                downloadCustomersReportPdf(orders, storeSettings);
+              }
+            }}
+            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Download Customer Directory PDF"
+          >
+            <FileText className="w-3.5 h-3.5 text-emerald-800" />
+            <span>Download Customers PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportCustomersCsv}
+            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Customers CSV</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}

@@ -577,3 +577,262 @@ export const downloadFoodCompliancePdf = (store: StoreSettings, products: Produc
 
   doc.save(`Maknuts-Food-FSSAI-Compliance-${Date.now()}.pdf`);
 };
+
+/**
+ * Download Beautiful Product Catalog PDF
+ */
+export const downloadProductsCatalogPdf = (products: Product[], store: StoreSettings) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Header Banner
+  doc.setFillColor(10, 47, 34);
+  doc.rect(0, 0, pageWidth, 28, 'F');
+  doc.setFillColor(217, 119, 6);
+  doc.rect(0, 28, pageWidth, 1.5, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(`${store.shopName?.toUpperCase() || 'MAKNUTS'} - OFFICIAL PRODUCT CATALOG`, 14, 13);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(230, 240, 235);
+  doc.text(`Pure Bihar Roasted Superfood | Official Pricing, Packaging & Inventory Sheet`, 14, 19);
+  doc.text(`FSSAI Lic: ${store.foodCompliance?.fssaiNumber || '10424000000000'} | Support: ${store.whatsappNumber || store.supportPhone || '+91 78010 51792'}`, 14, 24);
+
+  // Table
+  const rows = products.map((p, idx) => [
+    idx + 1,
+    p.name,
+    p.weight || '250g',
+    fmt(p.originalPrice || p.price),
+    fmt(p.price),
+    p.inStock ? 'IN STOCK' : 'OUT OF STOCK',
+    p.sku || `MK-SKU-${idx + 1}`,
+    p.tagline || '100% Roasted Natural Phool Makhana',
+  ]);
+
+  autoTable(doc, {
+    startY: 36,
+    head: [['#', 'Product Item', 'Weight', 'MRP', 'Selling Price', 'Availability', 'SKU Code', 'Grade & Notes']],
+    body: rows,
+    theme: 'grid',
+    headStyles: { fillColor: [10, 47, 34], textColor: [255, 255, 255], fontSize: 8 },
+    styles: { fontSize: 7.5, cellPadding: 2.5 },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 35, fontStyle: 'bold' },
+      2: { cellWidth: 16, halign: 'center' },
+      3: { cellWidth: 18, halign: 'right' },
+      4: { cellWidth: 22, halign: 'right', fontStyle: 'bold' },
+      5: { cellWidth: 22, halign: 'center' },
+      6: { cellWidth: 22 },
+      7: { cellWidth: 'auto' },
+    },
+  });
+
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(100, 116, 139);
+  doc.text('All products are sealed hygienic, gluten-free, cholesterol-free, and vacuum/nitrogen preserved.', 14, finalY);
+
+  // Footer
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(140, 140, 140);
+  doc.text(`Maknuts Store Operations Management System | Generated on ${new Date().toLocaleString('en-IN')}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+  doc.save(`Maknuts-Product-Catalog-${Date.now()}.pdf`);
+};
+
+/**
+ * Download Comprehensive Customer CRM Report PDF
+ */
+export const downloadCustomersReportPdf = (orders: Order[], store: StoreSettings) => {
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Header Banner
+  doc.setFillColor(10, 47, 34);
+  doc.rect(0, 0, pageWidth, 22, 'F');
+  doc.setFillColor(217, 119, 6);
+  doc.rect(0, 22, pageWidth, 1.2, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text(`${store.shopName?.toUpperCase() || 'MAKNUTS'} - CUSTOMER CRM & DIRECTORY DOSSIER`, 14, 11);
+
+  // Derive unique customer map
+  const customerMap = new Map<string, {
+    name: string;
+    phone: string;
+    address: string;
+    pincode: string;
+    orderCount: number;
+    totalSpent: number;
+    lastOrder: string;
+  }>();
+
+  for (const o of orders) {
+    const phone = (o.phone || '').trim().replace(/\s+/g, '');
+    if (!phone) continue;
+    const existing = customerMap.get(phone);
+    if (existing) {
+      existing.orderCount += 1;
+      existing.totalSpent += (o.totalAmount || 0);
+      existing.name = o.customerName || existing.name;
+      existing.address = o.address || existing.address;
+      existing.pincode = o.pincode || existing.pincode;
+      existing.lastOrder = o.createdAt || existing.lastOrder;
+    } else {
+      customerMap.set(phone, {
+        name: o.customerName || 'Customer',
+        phone,
+        address: o.address || 'N/A',
+        pincode: o.pincode || 'N/A',
+        orderCount: 1,
+        totalSpent: o.totalAmount || 0,
+        lastOrder: o.createdAt || '',
+      });
+    }
+  }
+
+  const customers = Array.from(customerMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(230, 240, 235);
+  doc.text(`Total Customers: ${customers.length} | Total Lifetime Value: ${fmt(totalRevenue)} | Generated: ${new Date().toLocaleString('en-IN')}`, 14, 17);
+
+  const rows = customers.map((c, idx) => [
+    idx + 1,
+    c.name,
+    `+91 ${c.phone}`,
+    c.orderCount,
+    fmt(c.totalSpent),
+    c.pincode,
+    c.address.slice(0, 50),
+    c.lastOrder ? new Date(c.lastOrder).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
+  ]);
+
+  autoTable(doc, {
+    startY: 28,
+    head: [['#', 'Customer Name', 'Mobile Number', 'Orders', 'Lifetime Spend', 'PIN', 'Delivery Address', 'Last Active']],
+    body: rows.length > 0 ? rows : [['-', 'No customer records found', '-', '-', '-', '-', '-', '-']],
+    theme: 'grid',
+    headStyles: { fillColor: [10, 47, 34], textColor: [255, 255, 255], fontSize: 8 },
+    styles: { fontSize: 7.5, cellPadding: 2 },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 35, fontStyle: 'bold' },
+      2: { cellWidth: 28 },
+      3: { cellWidth: 16, halign: 'center' },
+      4: { cellWidth: 26, halign: 'right', fontStyle: 'bold' },
+      5: { cellWidth: 18, halign: 'center' },
+      6: { cellWidth: 'auto' },
+      7: { cellWidth: 24, halign: 'center' },
+    },
+  });
+
+  // Footer
+  doc.setFontSize(7);
+  doc.setTextColor(140, 140, 140);
+  doc.text(`Maknuts Customer Confidential Records | Store Admin Console`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+  doc.save(`Maknuts-Customers-Report-${Date.now()}.pdf`);
+};
+
+/**
+ * Download Promo Coupons & Discount Policies PDF
+ */
+export const downloadCouponsReportPdf = (coupons: Coupon[], store: StoreSettings) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Header Banner
+  doc.setFillColor(10, 47, 34);
+  doc.rect(0, 0, pageWidth, 28, 'F');
+  doc.setFillColor(217, 119, 6);
+  doc.rect(0, 28, pageWidth, 1.5, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(`${store.shopName?.toUpperCase() || 'MAKNUTS'} - PROMOTIONAL COUPONS REPORT`, 14, 13);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(230, 240, 235);
+  doc.text(`Active Discount Vouchers, Terms & Promotional Rules Registry`, 14, 19);
+  doc.text(`Total Coupons Configured: ${coupons.length} | Active: ${coupons.filter(c => c.enabled).length} | Generated: ${new Date().toLocaleString('en-IN')}`, 14, 24);
+
+  const rows = coupons.map((c, idx) => [
+    idx + 1,
+    c.code,
+    c.discountType === 'percentage'
+      ? `${c.discountValue}% OFF`
+      : c.discountType === 'fixed'
+      ? `INR ${c.discountValue} FLAT`
+      : 'FREE SHIPPING',
+    fmt(c.minOrderValue || 0),
+    c.maxDiscount ? fmt(c.maxDiscount) : 'No Cap',
+    c.enabled ? 'ACTIVE / ENABLED' : 'DISABLED',
+    `Used: ${c.usedCount || 0} / ${c.usageLimit || 'Unlimited'}`,
+    c.expiryDate || 'No Expiry',
+  ]);
+
+  autoTable(doc, {
+    startY: 36,
+    head: [['#', 'Coupon Code', 'Discount Offer', 'Min Order', 'Max Discount', 'Current Status', 'Usage Count', 'Validity']],
+    body: rows.length > 0 ? rows : [['-', 'No coupons configured', '-', '-', '-', '-', '-', '-']],
+    theme: 'grid',
+    headStyles: { fillColor: [10, 47, 34], textColor: [255, 255, 255], fontSize: 8 },
+    styles: { fontSize: 7.5, cellPadding: 2.5 },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      1: { cellWidth: 28, fontStyle: 'bold' },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 20, halign: 'right' },
+      4: { cellWidth: 22, halign: 'right' },
+      5: { cellWidth: 26, halign: 'center' },
+      6: { cellWidth: 26, halign: 'center' },
+      7: { cellWidth: 'auto' },
+    },
+  });
+
+  const finalY = (doc as any).lastAutoTable.finalY + 8;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('Note: Disabled coupons cannot be applied or redeemed by store visitors at checkout.', 14, finalY);
+
+  // Footer
+  doc.setFontSize(7);
+  doc.setTextColor(140, 140, 140);
+  doc.text(`Maknuts Store Operations Management System | Generated on ${new Date().toLocaleString('en-IN')}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+  doc.save(`Maknuts-Coupons-Report-${Date.now()}.pdf`);
+};

@@ -8,7 +8,7 @@ import {
   Star, Sparkles, Award, Leaf, Heart, Camera, ShieldCheck, KeyRound, MessageSquareHeart, AlertCircle, RefreshCw, ArrowRight,
   Phone, Mail, MapPin, Clock, Headphones, ChevronLeft, ChevronRight, MoreHorizontal,
   Calculator, Tag, BadgePercent, History, Unlock, ShieldAlert, CreditCard,
-  Search, Filter, ArrowUpDown, Store, CheckCircle2, Menu, LayoutDashboard
+  Search, Filter, ArrowUpDown, Store, CheckCircle2, Menu, LayoutDashboard, Archive
 } from 'lucide-react';
 import { AdminSidebar, AdminTab } from './admin/AdminSidebar';
 import { AdminOverviewTab } from './admin/AdminOverviewTab';
@@ -25,7 +25,8 @@ import {
   downloadOrderInvoicePdf, 
   downloadOrdersReportPdf, 
   downloadStoreExecutiveReportPdf, 
-  downloadFoodCompliancePdf 
+  downloadFoodCompliancePdf,
+  downloadProductsCatalogPdf
 } from '../utils/pdfGenerator';
 import { createWhatsAppUrl } from '../utils/whatsapp';
 import { compressImageFile, optimizeProductForFirestore } from '../utils/imageCompressor';
@@ -69,6 +70,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     updateOrderFinancials,
     deleteOrder, 
     clearAllOrders, 
+    archiveAllOrders,
     deleteFeedback,
     deleteReviewAndFeedback,
     addGalleryPhoto,
@@ -209,6 +211,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
     estimatedDelivery: '',
     statusNotes: '',
   });
+
+  // Safe Order Deletion & Archival State (Requirement 11)
+  const [isClearOrdersModalOpen, setIsClearOrdersModalOpen] = useState(false);
+  const [clearOrdersConfirmationText, setClearOrdersConfirmationText] = useState('');
+  const [isProcessingOrderPurge, setIsProcessingOrderPurge] = useState(false);
+  const [orderPurgeActionType, setOrderPurgeActionType] = useState<'archive' | 'permanent'>('archive');
+  const [orderActionToast, setOrderActionToast] = useState<{ message: string; type: 'success' | 'danger' } | null>(null);
+
+  // Single order delete confirmation state
+  const [deletingSingleOrder, setDeletingSingleOrder] = useState<Order | null>(null);
 
   // Customer Reviews & Feedback Moderation State
   const [reviewFilter, setReviewFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -1011,6 +1023,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   )}
                 </button>
               </form>
+
+              {/* Exit to Public Storefront */}
+              <div className="pt-1 text-center">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs text-stone-500 hover:text-emerald-900 font-semibold inline-flex items-center gap-1.5 cursor-pointer py-1 px-3 rounded-lg hover:bg-stone-200/50 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Return to Public Storefront</span>
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -1143,6 +1167,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   <AdminCouponsTab
                     coupons={storeSettings.coupons || []}
                     products={products}
+                    orders={orders}
+                    storeSettings={storeSettings}
+                    onOpenOrder={(order) => {
+                      handleOpenStoreTab('orders');
+                      setOrderSearchQuery(order.orderNumber);
+                    }}
                     onSaveCoupons={async (updatedCoupons) => {
                       await updateSettings({ coupons: updatedCoupons });
                     }}
@@ -1179,6 +1209,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 {activeTab === 'customers' && (
                   <AdminCustomersTab
                     orders={orders}
+                    storeSettings={storeSettings}
                     onOpenOrder={(order) => {
                       handleOpenStoreTab('orders');
                       setOrderSearchQuery(order.orderNumber);
@@ -1250,14 +1281,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={startAddProduct}
-                      className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Add New Product</span>
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => downloadProductsCatalogPdf(products, storeSettings)}
+                        className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Download Product Catalog Sheet PDF"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-800" />
+                        <span>Download Catalog PDF</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={startAddProduct}
+                        className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add New Product</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Product Cards List */}
@@ -3808,7 +3851,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                         type="button"
                                         onClick={() => {
                                           setEditingReviewId(review.id);
-                                          setEditingReviewText(review.comment);
+                                          setEditingReviewText(review.comment || review.originalComment || '');
                                         }}
                                         className="text-[11px] font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
                                       >
@@ -3849,7 +3892,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                                     </div>
                                   ) : (
                                     <div className="p-3 bg-white rounded-xl border border-stone-200 text-xs text-stone-800 italic">
-                                      "{review.comment}"
+                                      "{review.comment || review.originalComment || ''}"
                                     </div>
                                   )}
 
@@ -4315,15 +4358,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     </div>
 
                     {orders.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          clearAllOrders();
-                        }}
-                        className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg text-xs font-semibold cursor-pointer"
-                      >
-                        Clear Order List
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrderPurgeActionType('archive');
+                            setClearOrdersConfirmationText('');
+                            setIsClearOrdersModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-colors"
+                        >
+                          <Archive className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Archive Orders</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrderPurgeActionType('permanent');
+                            setClearOrdersConfirmationText('');
+                            setIsClearOrdersModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-stone-100 hover:bg-rose-50 text-stone-600 hover:text-rose-700 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-stone-400" />
+                          <span>Clear Order List</span>
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -4548,7 +4608,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                               </div>
 
                               <button
-                                onClick={() => deleteOrder(order.id)}
+                                onClick={() => setDeletingSingleOrder(order)}
                                 className="min-h-[38px] min-w-[38px] rounded-xl bg-stone-100 hover:bg-rose-50 text-stone-400 hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer"
                                 title="Delete order record"
                               >
@@ -5476,6 +5536,247 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Single Order Delete Confirmation Modal */}
+        {deletingSingleOrder && (
+          <div
+            className="fixed inset-0 z-90 bg-stone-900/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+            onClick={() => setDeletingSingleOrder(null)}
+          >
+            <div
+              className="bg-white max-w-md w-full rounded-3xl p-5 sm:p-6 shadow-2xl border border-stone-200 space-y-4"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-700 shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm sm:text-base font-bold text-stone-900">
+                    Delete Order #{deletingSingleOrder.orderNumber}?
+                  </h4>
+                  <p className="text-xs text-stone-500">
+                    Customer: {deletingSingleOrder.customerName} (₹{deletingSingleOrder.totalAmount})
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-2xl p-3 border border-amber-200 text-xs text-amber-900 space-y-1">
+                <p className="font-semibold">⚠️ Action cannot be undone</p>
+                <p className="text-[11px] text-amber-800">
+                  This will permanently remove the order record and associated customer tracking entry from Firestore.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setDeletingSingleOrder(null)}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const id = deletingSingleOrder.id;
+                    const num = deletingSingleOrder.orderNumber;
+                    setDeletingSingleOrder(null);
+                    try {
+                      await deleteOrder(id);
+                      setOrderActionToast({ message: `Order #${num} successfully deleted.`, type: 'success' });
+                      setTimeout(() => setOrderActionToast(null), 3000);
+                    } catch (e: any) {
+                      setOrderActionToast({ message: `Failed to delete order: ${e?.message || 'Error'}`, type: 'danger' });
+                      setTimeout(() => setOrderActionToast(null), 3500);
+                    }
+                  }}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Order</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Clear All / Archive All Orders Safe Confirmation Modal (Requirement 11) */}
+        {isClearOrdersModalOpen && (
+          <div
+            className="fixed inset-0 z-90 bg-stone-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+            onClick={() => {
+              if (!isProcessingOrderPurge) {
+                setIsClearOrdersModalOpen(false);
+              }
+            }}
+          >
+            <div
+              className="bg-white max-w-lg w-full rounded-3xl p-5 sm:p-6 shadow-2xl border border-stone-200 space-y-4"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                  orderPurgeActionType === 'archive' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'
+                }`}>
+                  {orderPurgeActionType === 'archive' ? (
+                    <Archive className="w-6 h-6" />
+                  ) : (
+                    <AlertTriangle className="w-6 h-6" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-stone-900">
+                    {orderPurgeActionType === 'archive' ? 'Archive All Orders to Safe Vault' : 'Permanently Delete All Orders'}
+                  </h4>
+                  <p className="text-xs text-stone-500">
+                    Total {orders.length} order documents currently in system
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Selector */}
+              <div className="grid grid-cols-2 gap-2 bg-stone-100 p-1 rounded-2xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setOrderPurgeActionType('archive')}
+                  className={`py-2 px-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    orderPurgeActionType === 'archive'
+                      ? 'bg-white text-amber-950 shadow-xs'
+                      : 'text-stone-600 hover:text-stone-900'
+                  }`}
+                >
+                  <Archive className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Archive (Recommended)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderPurgeActionType('permanent')}
+                  className={`py-2 px-3 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    orderPurgeActionType === 'permanent'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'text-stone-600 hover:text-rose-700'
+                  }`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Permanent Delete</span>
+                </button>
+              </div>
+
+              {orderPurgeActionType === 'archive' ? (
+                <div className="bg-emerald-50 rounded-2xl p-3.5 border border-emerald-200 text-xs text-emerald-900 space-y-1.5">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                    <span>Safe Archival Storage</span>
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-emerald-800">
+                    All {orders.length} orders will be moved to the protected <code className="bg-emerald-100 px-1 py-0.5 rounded font-mono">archivedOrders</code> collection in Firestore batches with timestamp and admin credentials preserved. Active customer tracking will be closed.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-rose-50 rounded-2xl p-3.5 border border-rose-200 text-xs text-rose-900 space-y-1.5">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span>Permanent Irreversible Deletion</span>
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-rose-800">
+                    All {orders.length} orders and tracking records will be permanently erased from Firestore in batched transactions. No recovery is possible.
+                  </p>
+                </div>
+              )}
+
+              {/* Typed Confirmation required for permanent deletion */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-bold text-stone-800 block">
+                  To confirm, type <span className="font-mono text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 select-all font-black">{orderPurgeActionType === 'archive' ? 'ARCHIVE ALL ORDERS' : 'DELETE ALL ORDERS'}</span> below:
+                </label>
+                <input
+                  type="text"
+                  placeholder={orderPurgeActionType === 'archive' ? 'Type ARCHIVE ALL ORDERS' : 'Type DELETE ALL ORDERS'}
+                  value={clearOrdersConfirmationText}
+                  onChange={e => setClearOrdersConfirmationText(e.target.value)}
+                  disabled={isProcessingOrderPurge}
+                  className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-300 rounded-xl text-xs font-mono font-bold text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setIsClearOrdersModalOpen(false)}
+                  disabled={isProcessingOrderPurge}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    isProcessingOrderPurge ||
+                    clearOrdersConfirmationText.trim() !== (orderPurgeActionType === 'archive' ? 'ARCHIVE ALL ORDERS' : 'DELETE ALL ORDERS')
+                  }
+                  onClick={async () => {
+                    setIsProcessingOrderPurge(true);
+                    try {
+                      if (orderPurgeActionType === 'archive') {
+                        const count = await archiveAllOrders();
+                        setIsClearOrdersModalOpen(false);
+                        setOrderActionToast({ message: `Successfully archived ${count} orders to safe vault!`, type: 'success' });
+                      } else {
+                        await clearAllOrders();
+                        setIsClearOrdersModalOpen(false);
+                        setOrderActionToast({ message: `All ${orders.length} orders safely cleared via batched deletion.`, type: 'success' });
+                      }
+                      setTimeout(() => setOrderActionToast(null), 3500);
+                    } catch (e: any) {
+                      setOrderActionToast({ message: `Operation failed: ${e?.message || 'Error'}`, type: 'danger' });
+                      setTimeout(() => setOrderActionToast(null), 4000);
+                    } finally {
+                      setIsProcessingOrderPurge(false);
+                      setClearOrdersConfirmationText('');
+                    }
+                  }}
+                  className={`px-5 py-2 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    orderPurgeActionType === 'archive' ? 'bg-amber-700 hover:bg-amber-800' : 'bg-rose-600 hover:bg-rose-700'
+                  }`}
+                >
+                  {isProcessingOrderPurge ? (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Processing Batches...</span>
+                    </>
+                  ) : orderPurgeActionType === 'archive' ? (
+                    <>
+                      <Archive className="w-3.5 h-3.5" />
+                      <span>Archive All Orders</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Permanently Delete</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Order Action Toast Notification */}
+        {orderActionToast && (
+          <div className={`fixed bottom-6 right-6 z-90 px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold border animate-bounce ${
+            orderActionToast.type === 'success'
+              ? 'bg-emerald-900 text-white border-emerald-700'
+              : 'bg-rose-900 text-white border-rose-700'
+          }`}>
+            {orderActionToast.type === 'success' ? (
+              <Check className="w-4 h-4 text-amber-300" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-rose-300" />
+            )}
+            <span>{orderActionToast.message}</span>
           </div>
         )}
 

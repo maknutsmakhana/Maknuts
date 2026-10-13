@@ -2,20 +2,19 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Camera, X, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react';
 
+import { DEFAULT_SETTINGS } from '../constants';
+
 export const PhotoGallery: React.FC = () => {
   const { storeSettings } = useStore();
-  const gallery = storeSettings.gallerySection || {
-    title: 'Our Purity in Pictures',
-    subtitle: 'Direct from pristine wetlands of Mithila, Bihar to crispy, nutritious snack bowls.',
-    buttonLabel: '📸 View Photos',
-    photos: []
-  };
+  const gallery = storeSettings.gallerySection || DEFAULT_SETTINGS.gallerySection;
 
-  const photos = gallery.photos || [];
+  const photos = (gallery.photos && gallery.photos.length > 0)
+    ? gallery.photos
+    : DEFAULT_SETTINGS.gallerySection.photos;
   const [isWindowOpen, setIsWindowOpen] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
 
-  if (photos.length === 0) return null;
+  if (storeSettings.sectionVisibility?.gallerySection === false) return null;
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();

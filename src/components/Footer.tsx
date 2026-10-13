@@ -1,16 +1,16 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { MessageCircle, Mail, MapPin, Lock, ShieldCheck, Heart, MessageSquareHeart, Phone } from 'lucide-react';
+import { MessageCircle, Mail, MapPin, ShieldCheck, Heart, MessageSquareHeart, Phone } from 'lucide-react';
 import { createWhatsAppUrl } from '../utils/whatsapp';
 import maknutsLogo from '../assets/images/regenerated_image_1791357700332.png';
 
 interface FooterProps {
-  onOpenAdmin: () => void;
+  onOpenAdmin?: () => void;
   onOpenPolicy: (type: 'terms' | 'privacy' | 'returns' | 'shipping') => void;
   onOpenFeedback: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpenFeedback }) => {
+export const Footer: React.FC<FooterProps> = ({ onOpenPolicy, onOpenFeedback }) => {
   const { storeSettings } = useStore();
 
   const handleWhatsAppChat = () => {
@@ -136,20 +136,11 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdmin, onOpenPolicy, onOpe
         {/* Bottom bar matching user specification */}
         <div className="pt-6">
           <div className="border border-[#D8CABE] rounded-xl sm:rounded-2xl bg-white/75 overflow-hidden text-center text-xs text-stone-700 shadow-2xs divide-y divide-[#D8CABE]">
-            {/* Top row: Copyright & Admin Login */}
+            {/* Top row: Copyright */}
             <div className="py-2.5 px-4 flex flex-wrap items-center justify-center gap-2 sm:gap-2.5 leading-normal">
               <span>
                 © {new Date().getFullYear()} {storeSettings.shopName.includes('Makhana') ? storeSettings.shopName : `${storeSettings.shopName} Makhana`}. {storeSettings.footerText?.copyright || 'All rights reserved.'}
               </span>
-              <button
-                type="button"
-                onClick={onOpenAdmin}
-                className="inline-flex items-center gap-1.5 text-stone-700 hover:text-emerald-900 font-semibold transition-colors cursor-pointer group"
-                title="Store Admin Dashboard"
-              >
-                <Lock className="w-3.5 h-3.5 text-stone-600 group-hover:text-emerald-800" />
-                <span>Admin Login</span>
-              </button>
             </div>
 
             {/* Bottom row: Crafted with Love by Saroj */}

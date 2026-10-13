@@ -56,7 +56,7 @@ export const FoodComplianceSection: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base sm:text-lg font-bold text-stone-900 font-serif">
-                Food Safety, Nutrition & Statutory Details
+                {storeSettings.foodComplianceSectionTitle || 'Food Safety, Nutrition & Statutory Details'}
               </h3>
               {compliance.fssaiNumber && (
                 <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
@@ -65,7 +65,7 @@ export const FoodComplianceSection: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-stone-500">
-              Complete transparency: Tested nutritional facts, ingredients, allergen warnings, and manufacturer details.
+              {storeSettings.foodComplianceSectionSubtitle || 'Complete transparency: Tested nutritional facts, ingredients, allergen warnings, and manufacturer details.'}
             </p>
           </div>
         </div>

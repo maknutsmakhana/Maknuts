@@ -122,6 +122,8 @@ export interface HeroSectionSettings {
   bannerImage?: string;
   trustChips?: string[];
   showCtaButtons?: boolean;
+  enablePrimaryCta?: boolean;
+  enableSecondaryCta?: boolean;
 }
 
 export interface PromoBannerSettings {
@@ -176,6 +178,7 @@ export interface WhatsAppSettings {
   supportTemplate?: string;
   enableFloatingButton?: boolean;
   enabled?: boolean;
+  floatingButtonText?: string;
 }
 
 export interface FlashOfferSettings {
@@ -298,6 +301,9 @@ export interface StoreSettings {
     chatWhatsApp: string;
     trackOrder: string;
     trackBanner: string;
+    floatingWhatsApp?: string;
+    enableBuyNow?: boolean;
+    enableWhatsAppOrder?: boolean;
   };
   benefitsSection: BenefitsSectionSettings;
   reviewsSection: ReviewsSectionSettings;
@@ -314,6 +320,14 @@ export interface StoreSettings {
   // Top-to-Bottom Storefront Control
   sectionVisibility?: SectionVisibility;
   sectionOrder?: string[];
+  productSectionTitle?: string;
+  productSectionSubtitle?: string;
+  foodComplianceSectionTitle?: string;
+  foodComplianceSectionSubtitle?: string;
+  faqSectionTitle?: string;
+  faqSectionSubtitle?: string;
+  contactSectionTitle?: string;
+  contactSectionSubtitle?: string;
   heroSection?: HeroSectionSettings;
   promoBanner?: PromoBannerSettings;
   foodCompliance?: FoodComplianceSettings;
@@ -346,6 +360,7 @@ export interface OrderPricingSnapshot {
   discountValue: number;
   discountAmount: number;
   couponCode?: string;
+  couponType?: 'percentage' | 'fixed' | 'free_delivery';
   couponDiscount?: number;
   subtotal: number;
   deliveryCharge: number;
@@ -379,6 +394,7 @@ export interface Order {
   discountValue?: number;
   discountAmount?: number;
   couponCode?: string;
+  couponType?: 'percentage' | 'fixed' | 'free_delivery';
   couponDiscount?: number;
   subtotal: number;
   deliveryCharge: number;

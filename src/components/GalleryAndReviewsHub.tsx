@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Camera, Star, X, ChevronLeft, ChevronRight, Award, MessageSquareHeart, CheckCircle2, Store } from 'lucide-react';
 import { calculateReviewStats } from '../utils/reviews';
+import { DEFAULT_SETTINGS } from '../constants';
 
 interface GalleryAndReviewsHubProps {
   onOpenFeedback: () => void;
@@ -10,20 +11,11 @@ interface GalleryAndReviewsHubProps {
 export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOpenFeedback }) => {
   const { storeSettings, reviews } = useStore();
 
-  const gallery = storeSettings.gallerySection || {
-    title: 'Our Purity in Pictures',
-    subtitle: 'Direct from pristine wetlands of Mithila, Bihar to crispy, nutritious snack bowls.',
-    photos: []
-  };
-  const photos = gallery.photos || [];
+  const gallery = storeSettings.gallerySection || DEFAULT_SETTINGS.gallerySection;
+  const rawPhotos = gallery.photos || [];
+  const photos = rawPhotos.length > 0 ? rawPhotos : DEFAULT_SETTINGS.gallerySection.photos;
 
-  const reviewsSection = storeSettings.reviewsSection || {
-    title: 'Customer Reviews & Feedback',
-    subtitle: 'Genuine verified feedback from makhana lovers across India.',
-    ratingText: '',
-    guaranteeBadge: '100% Quality Guaranteed',
-    reviews: []
-  };
+  const reviewsSection = storeSettings.reviewsSection || DEFAULT_SETTINGS.reviewsSection;
 
   // Requirement 2 & 8 & 9: Only APPROVED reviews appear publicly and calculate ratings
   const approvedReviews = (reviews || []).filter(r => (r.status || 'approved') === 'approved');
@@ -50,25 +42,20 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
 
   return (
     <section aria-label="Photo Gallery & Customer Reviews Hub" className="my-5 sm:my-8">
-      {/* Side-by-Side Dual Button Box (Matches User Wireframe / Layout) */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-[#D8CABE] shadow-xs overflow-hidden grid grid-cols-2 divide-x divide-[#D8CABE]">
+      {/* Side-by-Side Dual Button Box matching user attached image in mobile & web */}
+      <div className="bg-white rounded-xl sm:rounded-2xl border-2 border-[#9DB2D0] shadow-xs overflow-hidden grid grid-cols-2 divide-x-2 divide-[#9DB2D0]">
         {/* Left Half: Photo Gallery */}
         <button
           type="button"
           onClick={() => setIsGalleryOpen(true)}
-          className="group p-4 sm:p-6 flex flex-col items-center justify-center text-center hover:bg-[#FAF8F5] active:bg-[#F4EFE6] transition-all cursor-pointer min-h-[82px] sm:min-h-[100px]"
+          className="group p-4 sm:p-7 flex flex-col items-center justify-center text-center hover:bg-[#F8FAFC] active:bg-[#EDF2F7] transition-all cursor-pointer min-h-[88px] sm:min-h-[115px]"
           aria-label="Open Photo Gallery"
         >
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0 group-hover:scale-110 transition-transform">
-              <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </div>
-            <span className="font-extrabold text-xs sm:text-base text-emerald-950 font-serif leading-tight">
-              Photo Gallery
-            </span>
-          </div>
-          <span className="text-[10px] sm:text-xs text-stone-500 font-medium truncate max-w-[140px] sm:max-w-none">
-            {photos.length > 0 ? `${photos.length} Verified Photos` : 'Explore Farm Visuals'}
+          <span className="text-base sm:text-xl md:text-2xl font-bold text-stone-900 group-hover:text-emerald-950 font-sans tracking-tight transition-colors">
+            Photo Galary
+          </span>
+          <span className="text-[11px] sm:text-xs text-stone-500 font-medium mt-1">
+            {photos.length} Verified Photos
           </span>
         </button>
 
@@ -76,23 +63,14 @@ export const GalleryAndReviewsHub: React.FC<GalleryAndReviewsHubProps> = ({ onOp
         <button
           type="button"
           onClick={() => setIsReviewsOpen(true)}
-          className="group p-4 sm:p-6 flex flex-col items-center justify-center text-center hover:bg-[#FAF8F5] active:bg-[#F4EFE6] transition-all cursor-pointer min-h-[82px] sm:min-h-[100px]"
+          className="group p-4 sm:p-7 flex flex-col items-center justify-center text-center hover:bg-[#F8FAFC] active:bg-[#EDF2F7] transition-all cursor-pointer min-h-[88px] sm:min-h-[115px]"
           aria-label="Open Customer Reviews"
         >
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 shrink-0 group-hover:scale-110 transition-transform">
-              <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-amber-400 stroke-amber-400" />
-            </div>
-            <span className="font-extrabold text-xs sm:text-base text-emerald-950 font-serif leading-tight">
-              View & Write Review
-            </span>
-          </div>
-          <span className="text-[10px] sm:text-xs text-stone-500 font-medium truncate max-w-[140px] sm:max-w-none">
-            {reviewStats.hasReviews ? (
-              <>★ {reviewStats.averageRating.toFixed(1)} / 5.0 · ({reviewStats.totalReviews} {reviewStats.totalReviews === 1 ? 'Review' : 'Reviews'})</>
-            ) : (
-              'No reviews yet.'
-            )}
+          <span className="text-base sm:text-xl md:text-2xl font-bold text-stone-900 group-hover:text-emerald-950 font-sans tracking-tight leading-snug transition-colors">
+            View & Write<br />Review
+          </span>
+          <span className="text-[11px] sm:text-xs text-amber-700 font-semibold mt-1">
+            {reviewStats.hasReviews ? `★ ${reviewStats.averageRating.toFixed(1)} / 5.0 (${reviewStats.totalReviews})` : 'Be the first to review'}
           </span>
         </button>
       </div>

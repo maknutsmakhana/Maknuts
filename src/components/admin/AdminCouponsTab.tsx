@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Coupon, Product } from '../../types';
+import { Coupon, Product, StoreSettings, Order } from '../../types';
 import { 
   Ticket, 
   Plus, 
@@ -15,18 +15,30 @@ import {
   Truck, 
   Sparkles,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Download,
+  Eye,
+  X,
+  ExternalLink,
+  Package
 } from 'lucide-react';
+import { downloadCouponsReportPdf } from '../../utils/pdfGenerator';
 
 interface AdminCouponsTabProps {
   coupons: Coupon[];
   products: Product[];
+  orders?: Order[];
+  storeSettings?: StoreSettings;
+  onOpenOrder?: (order: Order) => void;
   onSaveCoupons: (updatedCoupons: Coupon[]) => Promise<void>;
 }
 
 export const AdminCouponsTab: React.FC<AdminCouponsTabProps> = ({
   coupons,
   products,
+  orders = [],
+  storeSettings,
+  onOpenOrder,
   onSaveCoupons,
 }) => {
   const [couponList, setCouponList] = useState<Coupon[]>([...coupons]);
@@ -35,6 +47,7 @@ export const AdminCouponsTab: React.FC<AdminCouponsTabProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState(false);
+  const [viewOrdersForCoupon, setViewOrdersForCoupon] = useState<Coupon | null>(null);
 
   // New Coupon Form State
   const [form, setForm] = useState<Coupon>({
@@ -210,14 +223,30 @@ export const AdminCouponsTab: React.FC<AdminCouponsTabProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleStartAdd}
-          className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Coupon</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              if (storeSettings) {
+                downloadCouponsReportPdf(couponList, storeSettings);
+              }
+            }}
+            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Download Coupons Report PDF"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-800" />
+            <span>Download Coupons PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleStartAdd}
+            className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Coupon</span>
+          </button>
+        </div>
       </div>
 
       {/* Editor Modal / Drawer */}
@@ -410,6 +439,65 @@ export const AdminCouponsTab: React.FC<AdminCouponsTabProps> = ({
               </div>
             </div>
 
+            {/* Product-Specific Restriction Selector */}
+            <div className="p-3.5 bg-stone-50/90 rounded-xl border border-stone-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-stone-900 block">
+                    Product-Specific Restriction
+                  </span>
+                  <p className="text-[11px] text-stone-500">
+                    Apply to all products across the store or restrict this voucher to specific catalog items only.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-stone-800">
+                  <input
+                    type="checkbox"
+                    checked={!form.applicableProductIds || form.applicableProductIds.length === 0}
+                    onChange={e => {
+                      if (e.target.checked) {
+                        setForm({ ...form, applicableProductIds: undefined });
+                      } else {
+                        setForm({ ...form, applicableProductIds: products.length > 0 ? [products[0].id] : [] });
+                      }
+                    }}
+                    className="w-4 h-4 accent-emerald-800 rounded"
+                  />
+                  <span>All Products (Storewide)</span>
+                </label>
+              </div>
+
+              {form.applicableProductIds && form.applicableProductIds.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-2 border-t border-stone-200/80">
+                  {products.map(p => {
+                    const isSelected = form.applicableProductIds?.includes(p.id);
+                    return (
+                      <label
+                        key={p.id}
+                        className={`p-2 rounded-lg border flex items-center gap-2 cursor-pointer text-xs transition-colors ${
+                          isSelected ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-bold' : 'bg-white border-stone-200 text-stone-700'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => {
+                            const cur = form.applicableProductIds || [];
+                            const next = e.target.checked
+                              ? [...cur, p.id]
+                              : cur.filter(id => id !== p.id);
+                            setForm({ ...form, applicableProductIds: next.length > 0 ? next : undefined });
+                          }}
+                          className="w-4 h-4 accent-emerald-800 rounded"
+                        />
+                        <span className="truncate">{p.name} ({p.weight})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Checkbox Controls */}
             <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-stone-100">
               <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-stone-800">
@@ -553,8 +641,34 @@ export const AdminCouponsTab: React.FC<AdminCouponsTabProps> = ({
                       </td>
 
                       <td className="py-3 px-4 text-[11px] text-stone-600">
-                        <div>Used: {c.usedCount || 0} / {c.usageLimit || '∞'}</div>
-                        <div className="text-[10px] text-stone-400">Per user: {c.perCustomerLimit || 1}</div>
+                        {(() => {
+                          const ordersUsingThis = (orders || []).filter(o => 
+                            o.couponCode && o.couponCode.trim().toUpperCase() === c.code.trim().toUpperCase() && o.status !== 'Cancelled'
+                          );
+                          const totalUses = Math.max(c.usedCount || 0, ordersUsingThis.length);
+
+                          return (
+                            <div>
+                              <div className="font-semibold text-stone-900">
+                                Used: {totalUses} / {c.usageLimit || '∞'}
+                              </div>
+                              <div className="text-[10px] text-stone-400">
+                                Per user: {c.perCustomerLimit || 1}
+                              </div>
+                              {ordersUsingThis.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewOrdersForCoupon(c)}
+                                  className="mt-1 text-[10px] font-bold text-emerald-800 hover:text-emerald-950 underline flex items-center gap-1 cursor-pointer"
+                                  title="View all orders that redeemed this coupon"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>{ordersUsingThis.length} {ordersUsingThis.length === 1 ? 'Order' : 'Orders'}</span>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       <td className="py-3 px-4 text-[11px]">
@@ -617,6 +731,137 @@ export const AdminCouponsTab: React.FC<AdminCouponsTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* ========================================================
+          MODAL: VIEW ORDERS THAT REDEEMED THIS COUPON
+         ======================================================== */}
+      {viewOrdersForCoupon && (
+        <div 
+          className="fixed inset-0 z-50 bg-stone-900/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in"
+          onClick={() => setViewOrdersForCoupon(null)}
+        >
+          <div 
+            className="bg-white w-full max-w-4xl max-h-[85vh] rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col my-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-5 py-4 bg-[#FAF8F5] border-b border-stone-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-stone-900 font-serif flex items-center gap-2">
+                  <Ticket className="w-5 h-5 text-emerald-800" />
+                  <span>Orders Redeeming Coupon: <span className="font-mono text-emerald-800 font-black">{viewOrdersForCoupon.code}</span></span>
+                </h3>
+                <p className="text-xs text-stone-500">
+                  {viewOrdersForCoupon.discountType === 'percentage' 
+                    ? `${viewOrdersForCoupon.discountValue}% Discount` 
+                    : viewOrdersForCoupon.discountType === 'fixed' 
+                    ? `Flat ₹${viewOrdersForCoupon.discountValue} Discount` 
+                    : 'Free Delivery Waiver'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewOrdersForCoupon(null)}
+                className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Orders Table Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {(() => {
+                const matchingOrders = (orders || []).filter(o => 
+                  o.couponCode && o.couponCode.trim().toUpperCase() === viewOrdersForCoupon.code.trim().toUpperCase() && o.status !== 'Cancelled'
+                );
+
+                if (matchingOrders.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-stone-400 text-xs">
+                      No orders have redeemed coupon "{viewOrdersForCoupon.code}" yet.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs font-semibold text-stone-600 px-1">
+                      <span>{matchingOrders.length} {matchingOrders.length === 1 ? 'order' : 'orders'} found</span>
+                      <span>Total Coupon Savings: ₹{matchingOrders.reduce((sum, o) => sum + (o.couponDiscount || o.pricingSnapshot?.couponDiscount || 0), 0)}</span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-stone-200">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-stone-50 border-b border-stone-200 text-[10px] uppercase font-bold text-stone-500">
+                          <tr>
+                            <th className="py-2.5 px-3">Order #</th>
+                            <th className="py-2.5 px-3">Date</th>
+                            <th className="py-2.5 px-3">Customer</th>
+                            <th className="py-2.5 px-3">Item / Qty</th>
+                            <th className="py-2.5 px-3">Coupon Disc.</th>
+                            <th className="py-2.5 px-3">Final Amount</th>
+                            <th className="py-2.5 px-3">Payment</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100">
+                          {matchingOrders.map(order => (
+                            <tr key={order.id} className="hover:bg-amber-50/30 transition-colors">
+                              <td className="py-2.5 px-3 font-mono font-bold text-emerald-950">
+                                {order.orderNumber}
+                              </td>
+                              <td className="py-2.5 px-3 text-[11px] text-stone-600 whitespace-nowrap">
+                                {new Date(order.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="font-semibold text-stone-900">{order.customerName}</div>
+                                <div className="text-[10px] text-stone-500">{order.phone}</div>
+                              </td>
+                              <td className="py-2.5 px-3 text-[11px] text-stone-700">
+                                {order.productName} ({order.quantity}x)
+                              </td>
+                              <td className="py-2.5 px-3 font-bold text-emerald-800">
+                                −₹{order.couponDiscount || order.pricingSnapshot?.couponDiscount || 0}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono font-bold text-stone-900">
+                                ₹{order.totalAmount}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  order.paymentStatus === 'Paid / Verified'
+                                    ? 'bg-emerald-100 text-emerald-900'
+                                    : 'bg-amber-100 text-amber-900'
+                                }`}>
+                                  {order.paymentMethod?.toUpperCase()} · {order.paymentStatus}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                {onOpenOrder && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setViewOrdersForCoupon(null);
+                                      onOpenOrder(order);
+                                    }}
+                                    className="px-2.5 py-1 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors"
+                                  >
+                                    View
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

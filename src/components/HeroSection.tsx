@@ -62,28 +62,46 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onShopNow }) => {
         )}
 
         {/* CTA Buttons */}
-        {hero.showCtaButtons && (
+        {hero.showCtaButtons !== false && (
           <div className="flex flex-wrap items-center gap-3 pt-3">
-            <button
-              type="button"
-              onClick={onShopNow}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-950/30 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              <span>{hero.primaryCtaText || 'Shop Fresh Harvest'}</span>
-            </button>
+            {hero.enablePrimaryCta !== false && (
+              <button
+                type="button"
+                onClick={onShopNow}
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-950/30 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>{hero.primaryCtaText || 'Shop Fresh Harvest'}</span>
+              </button>
+            )}
 
-            <button
-              type="button"
-              onClick={handleWhatsAppOrder}
-              className="px-5 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm border border-white/20 backdrop-blur-xs flex items-center gap-2 cursor-pointer transition-all active:scale-95"
-            >
-              <MessageCircle className="w-4 h-4 text-[#25D366]" />
-              <span>{hero.secondaryCtaText || 'Quick WhatsApp Order'}</span>
-            </button>
+            {hero.enableSecondaryCta !== false && (
+              <button
+                type="button"
+                onClick={handleWhatsAppOrder}
+                className="px-5 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm border border-white/20 backdrop-blur-xs flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+              >
+                <MessageCircle className="w-4 h-4 text-[#25D366]" />
+                <span>{hero.secondaryCtaText || 'Quick WhatsApp Order'}</span>
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Hero Banner Image (if configured) */}
+      {hero.bannerImage && (
+        <div className="mt-6 md:mt-0 md:absolute md:right-8 md:top-1/2 md:-translate-y-1/2 z-10 w-full md:w-72 lg:w-80 shrink-0">
+          <div className="rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-stone-900/40 backdrop-blur-xs group">
+            <img
+              src={hero.bannerImage}
+              alt={hero.heading || 'Hero Product Banner'}
+              className="w-full h-44 sm:h-52 md:h-60 object-cover object-center group-hover:scale-105 transition-transform duration-500"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

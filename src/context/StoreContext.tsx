@@ -10,11 +10,12 @@ import {
   PaymentStatus, 
   OrderPricingSnapshot,
   OrderAuditEntry,
+  Coupon,
   getOrderTrackingKey 
 } from '../types';
 import { DEFAULT_PRODUCT, DEFAULT_SETTINGS } from '../constants';
 import { optimizeProductForFirestore, optimizeSettingsForFirestore } from '../utils/imageCompressor';
-import { calculateOrderPricing, generateUniqueOrderId, round2 } from '../utils/pricing';
+import { calculateOrderPricing, generateUniqueOrderId, round2, validateAndApplyCoupon } from '../utils/pricing';
 import { 
   collection, 
   doc, 
@@ -96,6 +97,7 @@ interface StoreContextType {
   ) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   clearAllOrders: () => Promise<void>;
+  archiveAllOrders: () => Promise<number>;
   trackCustomerOrder: (orderNumber: string, phone: string) => Promise<OrderTrackingInfo | null>;
   verifyOrderForReview: (orderId?: string, phone?: string) => Promise<boolean>;
   submitCustomerReview: (data: {
@@ -323,25 +325,69 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const itemStatus = (data.status as 'pending' | 'approved' | 'rejected') || 'pending';
           
           feedbackList.push(data as Feedback);
+
+          // Find fallback from settings or default constants to prevent wiped comments
+          const settingsMatch = (storeSettings.reviewsSection?.reviews || []).find(sr => sr.id === d.id) ||
+            DEFAULT_SETTINGS.reviewsSection?.reviews?.find(sr => sr.id === d.id);
+
+          const rawComment = (data.comment || data.message || '').trim();
+          const fallbackComment = (settingsMatch?.comment || settingsMatch?.originalComment || '').trim();
+          const effectiveComment = rawComment || fallbackComment;
+
+          const rawName = (data.name || data.customerName || '').trim();
+          const fallbackName = (settingsMatch?.name || 'Customer').trim();
+          const effectiveName = rawName || fallbackName;
+
+          const effectiveLocation = data.location || settingsMatch?.location || '';
+          const effectiveRating = data.rating !== undefined && data.rating !== null && !isNaN(Number(data.rating))
+            ? Math.min(5, Math.max(1, Math.round(Number(data.rating))))
+            : (settingsMatch?.rating || 5);
+
+          const effectiveStatus = (data.status as 'pending' | 'approved' | 'rejected') || settingsMatch?.status || itemStatus;
+          const effectiveVerifiedBuyer = data.verifiedBuyer !== undefined 
+            ? Boolean(data.verifiedBuyer) 
+            : (settingsMatch?.verifiedBuyer ?? true);
+
+          const effectiveOriginalComment = data.originalComment || settingsMatch?.originalComment || (fallbackComment && fallbackComment !== effectiveComment ? fallbackComment : undefined);
+
+          const effectiveStoreReply = data.storeReply !== undefined && data.storeReply !== null && data.storeReply !== ''
+            ? data.storeReply
+            : settingsMatch?.storeReply;
+
+          const effectiveStoreReplyAt = data.storeReplyAt !== undefined && data.storeReplyAt !== null && data.storeReplyAt !== ''
+            ? data.storeReplyAt
+            : settingsMatch?.storeReplyAt;
+
+          // Self-heal: If document was saved without comment, update Firestore asynchronously with preserved comment
+          if (!rawComment && fallbackComment && adminUser) {
+            setDoc(d.ref, {
+              comment: fallbackComment,
+              message: fallbackComment,
+              name: effectiveName,
+              rating: effectiveRating,
+              status: effectiveStatus,
+            }, { merge: true }).catch(() => {});
+          }
+
           reviewList.push({
             id: d.id,
-            name: data.name || data.customerName || 'Customer',
-            location: data.location || '',
-            rating: Math.min(5, Math.max(1, Math.round(Number(data.rating) || 5))),
-            comment: data.comment || data.message || '',
-            originalComment: data.originalComment,
-            adminEditedAt: data.adminEditedAt,
-            orderId: data.orderId,
-            phone: data.phone,
-            email: data.email,
-            photo: data.photo,
-            category: data.category,
-            status: itemStatus,
-            verifiedBuyer: Boolean(data.verifiedBuyer),
-            verifiedOrderNumber: data.verifiedOrderNumber,
-            storeReply: data.storeReply,
-            storeReplyAt: data.storeReplyAt,
-            createdAt: data.createdAt || new Date().toISOString(),
+            name: effectiveName,
+            location: effectiveLocation,
+            rating: effectiveRating,
+            comment: effectiveComment,
+            originalComment: effectiveOriginalComment,
+            adminEditedAt: data.adminEditedAt || settingsMatch?.adminEditedAt,
+            orderId: data.orderId || settingsMatch?.orderId,
+            phone: data.phone || settingsMatch?.phone,
+            email: data.email || settingsMatch?.email,
+            photo: data.photo || settingsMatch?.photo,
+            category: data.category || settingsMatch?.category,
+            status: effectiveStatus,
+            verifiedBuyer: effectiveVerifiedBuyer,
+            verifiedOrderNumber: data.verifiedOrderNumber || settingsMatch?.verifiedOrderNumber,
+            storeReply: effectiveStoreReply,
+            storeReplyAt: effectiveStoreReplyAt,
+            createdAt: data.createdAt || settingsMatch?.createdAt || new Date().toISOString(),
           });
         });
 
@@ -349,7 +395,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setFeedbacks(feedbackList);
 
         // Merge with any approved reviews stored in storeSettings (e.g. initial seed)
-        const settingsReviews = storeSettings.reviewsSection?.reviews || [];
+        const settingsReviews = storeSettings.reviewsSection?.reviews && storeSettings.reviewsSection.reviews.length > 0
+          ? storeSettings.reviewsSection.reviews
+          : (DEFAULT_SETTINGS.reviewsSection?.reviews || []);
         const existingIds = new Set(reviewList.map(r => r.id));
         const mergedReviews = [...reviewList];
 
@@ -563,11 +611,34 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Look up authoritative product record - do NOT trust client-manipulated unit price or discount
     const product = products.find(p => p.id === orderData.productId) || products[0] || DEFAULT_PRODUCT;
     
-    // Look up applicable coupon if customer provided one
+    // Look up applicable coupon if customer provided one - authoritative server-side validation
     const couponCode = orderData.couponCode?.trim().toUpperCase();
-    const appliedCoupon = couponCode 
-      ? (storeSettings.coupons || []).find(c => c.code.trim().toUpperCase() === couponCode)
-      : null;
+    let appliedCoupon: Coupon | null = null;
+    if (couponCode) {
+      const found = (storeSettings.coupons || []).find(c => c.code.trim().toUpperCase() === couponCode);
+      if (found) {
+        let localOrders: any[] = [];
+        try {
+          const localOrdersRaw = localStorage.getItem('maknuts_my_orders');
+          localOrders = localOrdersRaw ? JSON.parse(localOrdersRaw) : [];
+        } catch {
+          // ignore
+        }
+        const allKnownOrders = [...(orders || []), ...localOrders];
+
+        const validation = validateAndApplyCoupon(
+          couponCode,
+          storeSettings.coupons || [],
+          product.price * orderData.quantity,
+          product.id,
+          orderData.phone,
+          allKnownOrders
+        );
+        if (validation.isValid && validation.coupon) {
+          appliedCoupon = validation.coupon;
+        }
+      }
+    }
 
     // Centralized calculation with business rules (min/max qty, discount logic, coupon, free delivery threshold)
     const pricing = calculateOrderPricing({
@@ -576,6 +647,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       quantity: orderData.quantity,
       settings: storeSettings,
       appliedCoupon,
+      productId: product.id,
+      customerPhone: orderData.phone,
     });
 
     // Create immutable pricing snapshot frozen at purchase time
@@ -590,6 +663,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       discountValue: pricing.discountValue,
       discountAmount: pricing.discountAmount,
       couponCode: pricing.couponCode,
+      couponType: pricing.couponType,
       couponDiscount: pricing.couponDiscount,
       subtotal: pricing.subtotal,
       deliveryCharge: pricing.deliveryCharge,
@@ -622,6 +696,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       discountValue: pricing.discountValue,
       discountAmount: pricing.discountAmount,
       couponCode: pricing.couponCode,
+      couponType: pricing.couponType,
       couponDiscount: pricing.couponDiscount,
       subtotal: pricing.subtotal,
       deliveryCharge: pricing.deliveryCharge,
@@ -676,6 +751,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         localStorage.setItem('maknuts_my_orders', JSON.stringify([newOrder, ...list.filter((o: any) => o.id !== newOrder.id)].slice(0, 30)));
       } catch {
         // Non-fatal
+      }
+
+      // 3. Increment coupon usage count upon successful order creation
+      if (appliedCoupon) {
+        try {
+          const updatedCoupons = (storeSettings.coupons || []).map(c => {
+            if (c.id === appliedCoupon!.id || c.code.trim().toUpperCase() === appliedCoupon!.code.trim().toUpperCase()) {
+              return {
+                ...c,
+                usedCount: (c.usedCount || 0) + 1,
+              };
+            }
+            return c;
+          });
+          setStoreSettings(prev => ({ ...prev, coupons: updatedCoupons }));
+          if (auth.currentUser) {
+            await setDoc(doc(db, 'settings', 'store'), sanitizeForFirestore({ coupons: updatedCoupons }), { merge: true }).catch(() => {});
+          }
+        } catch (couponErr) {
+          console.warn('Coupon usage increment note:', couponErr);
+        }
       }
 
       return newOrder;
@@ -941,21 +1037,80 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Firebase Clear All Orders
+  // Firebase Safe Batched Clear All Orders (Admin only)
   const clearAllOrders = async (): Promise<void> => {
+    if (!adminUser) {
+      throw new Error('Admin authorization required to clear orders.');
+    }
     try {
       const snap = await getDocs(collection(db, 'orders'));
-      const batch = writeBatch(db);
-      snap.forEach(d => {
-        batch.delete(d.ref);
-      });
+      const docs = snap.docs;
+      
+      // Safe batched deletion (max 400 operations per Firestore batch)
+      const BATCH_SIZE = 400;
+      for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = docs.slice(i, i + BATCH_SIZE);
+        chunk.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+
       const trackSnap = await getDocs(collection(db, 'orderTracking'));
-      trackSnap.forEach(d => {
-        batch.delete(d.ref);
-      });
-      await batch.commit();
+      const trackDocs = trackSnap.docs;
+      for (let i = 0; i < trackDocs.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = trackDocs.slice(i, i + BATCH_SIZE);
+        chunk.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      setOrders([]);
     } catch (e) {
       handleFirestoreError(e, OperationType.DELETE, 'orders');
+    }
+  };
+
+  // Safe Archive Orders before clearing (moves to archivedOrders collection in batches)
+  const archiveAllOrders = async (): Promise<number> => {
+    if (!adminUser) {
+      throw new Error('Admin authorization required to archive orders.');
+    }
+    try {
+      const snap = await getDocs(collection(db, 'orders'));
+      const docs = snap.docs;
+      if (docs.length === 0) return 0;
+
+      const BATCH_SIZE = 200; // 200 reads + 200 writes = 400 ops safe limit
+      for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = docs.slice(i, i + BATCH_SIZE);
+        chunk.forEach(d => {
+          const archivedRef = doc(db, 'archivedOrders', d.id);
+          batch.set(archivedRef, {
+            ...d.data(),
+            archivedAt: new Date().toISOString(),
+            archivedBy: adminUser.email || 'admin'
+          });
+          batch.delete(d.ref);
+        });
+        await batch.commit();
+      }
+
+      // Also clean up orderTracking in batches
+      const trackSnap = await getDocs(collection(db, 'orderTracking'));
+      const trackDocs = trackSnap.docs;
+      for (let i = 0; i < trackDocs.length; i += 400) {
+        const batch = writeBatch(db);
+        const chunk = trackDocs.slice(i, i + 400);
+        chunk.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      setOrders([]);
+      return docs.length;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'archivedOrders');
+      return 0;
     }
   };
 
@@ -1161,7 +1316,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Requirement 3: Admin Approve Review
   const approveReview = async (reviewId: string): Promise<void> => {
-    const target = reviews.find(r => r.id === reviewId);
+    const target = reviews.find(r => r.id === reviewId) ||
+      (storeSettings.reviewsSection?.reviews || []).find(r => r.id === reviewId) ||
+      DEFAULT_SETTINGS.reviewsSection?.reviews?.find(r => r.id === reviewId);
     
     // Check genuine verified buyer status (Requirement 7: exact order ID + matching phone + Delivered/Completed)
     let isDelivered = Boolean(target?.verifiedBuyer);
@@ -1172,9 +1329,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
+    const safeComment = target?.comment || target?.originalComment || '';
+    const safeName = target?.name || 'Customer';
+
     const updatedReview: ReviewItem = target
-      ? { ...target, status: 'approved', verifiedBuyer: isDelivered }
-      : { id: reviewId, name: 'Customer', rating: 5, comment: '', status: 'approved', verifiedBuyer: isDelivered, createdAt: new Date().toISOString() };
+      ? { ...target, comment: safeComment, name: safeName, status: 'approved', verifiedBuyer: isDelivered }
+      : { id: reviewId, name: 'Customer', rating: 5, comment: safeComment, status: 'approved', verifiedBuyer: isDelivered, createdAt: new Date().toISOString() };
 
     try {
       await setDoc(doc(db, 'feedbacks', reviewId), sanitizeForFirestore({
@@ -1189,13 +1349,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // Instant local state update
-    setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, status: 'approved', verifiedBuyer: isDelivered } : r));
+    setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, ...updatedReview } : r));
 
     // Sync to storeSettings.reviewsSection.reviews
-    const current = storeSettings.reviewsSection?.reviews || [];
+    const current = storeSettings.reviewsSection?.reviews && storeSettings.reviewsSection.reviews.length > 0
+      ? storeSettings.reviewsSection.reviews
+      : (DEFAULT_SETTINGS.reviewsSection?.reviews || []);
     const exists = current.some(r => r.id === reviewId);
     const updatedList = exists
-      ? current.map(r => r.id === reviewId ? { ...r, status: 'approved' as const, verifiedBuyer: isDelivered } : r)
+      ? current.map(r => r.id === reviewId ? { ...r, ...updatedReview } : r)
       : [updatedReview, ...current];
 
     await updateSettings({
@@ -1208,8 +1370,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Requirement 3: Admin Reject/Hide Review
   const rejectReview = async (reviewId: string): Promise<void> => {
+    const target = reviews.find(r => r.id === reviewId) ||
+      (storeSettings.reviewsSection?.reviews || []).find(r => r.id === reviewId) ||
+      DEFAULT_SETTINGS.reviewsSection?.reviews?.find(r => r.id === reviewId);
+
     try {
-      await setDoc(doc(db, 'feedbacks', reviewId), { status: 'rejected' }, { merge: true });
+      if (target) {
+        await setDoc(doc(db, 'feedbacks', reviewId), sanitizeForFirestore({
+          name: target.name || 'Customer',
+          customerName: target.name || 'Customer',
+          comment: target.comment || '',
+          message: target.comment || '',
+          rating: target.rating ?? 5,
+          location: target.location || '',
+          status: 'rejected',
+          verifiedBuyer: target.verifiedBuyer ?? false,
+          createdAt: target.createdAt || new Date().toISOString(),
+          ...(target.storeReply ? { storeReply: target.storeReply, storeReplyAt: target.storeReplyAt } : {}),
+        }), { merge: true });
+      } else {
+        await setDoc(doc(db, 'feedbacks', reviewId), { status: 'rejected' }, { merge: true });
+      }
     } catch (e) {
       console.warn('Could not update doc in feedbacks:', e);
     }
@@ -1255,19 +1436,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Requirement 11: Admin Edit Customer Review Text (Preserving originalComment and adminEditedAt)
   const updateReviewText = async (reviewId: string, newComment: string): Promise<void> => {
-    const target = reviews.find(r => r.id === reviewId);
+    const target = reviews.find(r => r.id === reviewId) ||
+      (storeSettings.reviewsSection?.reviews || []).find(r => r.id === reviewId) ||
+      DEFAULT_SETTINGS.reviewsSection?.reviews?.find(r => r.id === reviewId);
     if (!target) return;
     const originalComment = target.originalComment || target.comment;
     const comment = newComment.trim();
     const adminEditedAt = new Date().toISOString();
 
     try {
-      await setDoc(doc(db, 'feedbacks', reviewId), {
+      const payload: Record<string, any> = {
+        name: target.name || 'Customer',
+        customerName: target.name || 'Customer',
         comment,
         message: comment,
         originalComment,
         adminEditedAt,
-      }, { merge: true });
+        rating: target.rating ?? 5,
+        location: target.location || '',
+        status: target.status || 'approved',
+        verifiedBuyer: target.verifiedBuyer !== undefined ? target.verifiedBuyer : true,
+        createdAt: target.createdAt || new Date().toISOString(),
+      };
+      if (target.storeReply) payload.storeReply = target.storeReply;
+      if (target.storeReplyAt) payload.storeReplyAt = target.storeReplyAt;
+      if (target.photo) payload.photo = target.photo;
+      if (target.category) payload.category = target.category;
+      if (target.orderId) payload.orderId = target.orderId;
+      if (target.phone) payload.phone = target.phone;
+
+      await setDoc(doc(db, 'feedbacks', reviewId), sanitizeForFirestore(payload), { merge: true });
     } catch (e) {
       console.warn('Could not update doc in feedbacks:', e);
     }
@@ -1280,13 +1478,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       adminEditedAt,
     } : r));
 
-    const current = storeSettings.reviewsSection?.reviews || [];
-    const updatedList = current.map(r => r.id === reviewId ? {
-      ...r,
-      comment,
-      originalComment,
-      adminEditedAt,
-    } : r);
+    const current = storeSettings.reviewsSection?.reviews && storeSettings.reviewsSection.reviews.length > 0
+      ? storeSettings.reviewsSection.reviews
+      : (DEFAULT_SETTINGS.reviewsSection?.reviews || []);
+    const exists = current.some(r => r.id === reviewId);
+    const updatedList = exists
+      ? current.map(r => r.id === reviewId ? {
+          ...r,
+          comment,
+          originalComment,
+          adminEditedAt,
+        } : r)
+      : [{
+          ...target,
+          comment,
+          originalComment,
+          adminEditedAt,
+        }, ...current];
 
     await updateSettings({
       reviewsSection: {
@@ -1296,33 +1504,102 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  // Requirement 10: Admin Add/Edit/Remove Public Store Reply
+  // Requirement 10: Admin Add/Edit/Remove Public Store Reply (Strictly preserving comment & review metadata)
   const updateStoreReply = async (reviewId: string, replyText: string | null): Promise<void> => {
     const storeReply = replyText && replyText.trim() ? replyText.trim() : null;
     const storeReplyAt = storeReply ? new Date().toISOString() : null;
 
+    // Locate existing review from local state or settings to guarantee comment is never wiped
+    const target = reviews.find(r => r.id === reviewId) ||
+      (storeSettings.reviewsSection?.reviews || []).find(r => r.id === reviewId) ||
+      DEFAULT_SETTINGS.reviewsSection?.reviews?.find(r => r.id === reviewId);
+
+    const safeComment = (target?.comment || target?.originalComment || '').trim();
+    const safeName = (target?.name || 'Customer').trim();
+    const safeRating = target?.rating ?? 5;
+    const safeLocation = target?.location || '';
+    const safeStatus = target?.status || 'approved';
+    const safeVerifiedBuyer = target?.verifiedBuyer !== undefined ? target.verifiedBuyer : true;
+    const safeCreatedAt = target?.createdAt || new Date().toISOString();
+    const safePhoto = target?.photo || '';
+    const safeCategory = target?.category || '';
+    const safeOrderId = target?.orderId || '';
+    const safePhone = target?.phone || '';
+    const safeOriginalComment = target?.originalComment || safeComment;
+    const safeAdminEditedAt = target?.adminEditedAt || '';
+
     try {
-      await setDoc(doc(db, 'feedbacks', reviewId), {
+      const payload: Record<string, any> = {
+        name: safeName,
+        customerName: safeName,
+        comment: safeComment,
+        message: safeComment,
+        rating: safeRating,
+        location: safeLocation,
+        status: safeStatus,
+        verifiedBuyer: safeVerifiedBuyer,
+        createdAt: safeCreatedAt,
         storeReply: storeReply || '',
         storeReplyAt: storeReplyAt || '',
-      }, { merge: true });
+      };
+      if (safeOriginalComment) payload.originalComment = safeOriginalComment;
+      if (safeAdminEditedAt) payload.adminEditedAt = safeAdminEditedAt;
+      if (safePhoto) payload.photo = safePhoto;
+      if (safeCategory) payload.category = safeCategory;
+      if (safeOrderId) payload.orderId = safeOrderId;
+      if (safePhone) payload.phone = safePhone;
+
+      await setDoc(doc(db, 'feedbacks', reviewId), sanitizeForFirestore(payload), { merge: true });
     } catch (e) {
       console.warn('Could not update doc in feedbacks:', e);
     }
 
-    // Instant local state update
-    setReviews(prev => prev.map(r => r.id === reviewId ? {
-      ...r,
-      storeReply: storeReply || undefined,
-      storeReplyAt: storeReplyAt || undefined,
-    } : r));
+    // Instant local state update for reviews: strictly retain comment!
+    setReviews(prev => prev.map(r => {
+      if (r.id !== reviewId) return r;
+      return {
+        ...r,
+        comment: (r.comment && r.comment.trim()) ? r.comment : safeComment,
+        name: r.name || safeName,
+        rating: r.rating || safeRating,
+        storeReply: storeReply || undefined,
+        storeReplyAt: storeReplyAt || undefined,
+      };
+    }));
 
-    const current = storeSettings.reviewsSection?.reviews || [];
-    const updatedList = current.map(r => r.id === reviewId ? {
-      ...r,
-      storeReply: storeReply || undefined,
-      storeReplyAt: storeReplyAt || undefined,
-    } : r);
+    const current = storeSettings.reviewsSection?.reviews && storeSettings.reviewsSection.reviews.length > 0
+      ? storeSettings.reviewsSection.reviews
+      : (DEFAULT_SETTINGS.reviewsSection?.reviews || []);
+    const exists = current.some(r => r.id === reviewId);
+    let updatedList: ReviewItem[];
+
+    if (exists) {
+      updatedList = current.map(r => {
+        if (r.id !== reviewId) return r;
+        return {
+          ...r,
+          comment: (r.comment && r.comment.trim()) ? r.comment : safeComment,
+          name: r.name || safeName,
+          rating: r.rating || safeRating,
+          storeReply: storeReply || undefined,
+          storeReplyAt: storeReplyAt || undefined,
+        };
+      });
+    } else if (target) {
+      updatedList = [
+        {
+          ...target,
+          comment: safeComment,
+          name: safeName,
+          rating: safeRating,
+          storeReply: storeReply || undefined,
+          storeReplyAt: storeReplyAt || undefined,
+        },
+        ...current,
+      ];
+    } else {
+      updatedList = current;
+    }
 
     await updateSettings({
       reviewsSection: {
@@ -1497,6 +1774,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateOrderFinancials,
         deleteOrder,
         clearAllOrders,
+        archiveAllOrders,
         trackCustomerOrder,
         verifyOrderForReview,
         submitCustomerReview,

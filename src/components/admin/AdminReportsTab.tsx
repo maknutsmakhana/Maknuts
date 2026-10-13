@@ -16,7 +16,14 @@ import {
   FileText
 } from 'lucide-react';
 import { calculateReviewStats } from '../../utils/reviews';
-import { downloadStoreExecutiveReportPdf, downloadOrdersReportPdf } from '../../utils/pdfGenerator';
+import { 
+  downloadStoreExecutiveReportPdf, 
+  downloadOrdersReportPdf,
+  downloadProductsCatalogPdf,
+  downloadCustomersReportPdf,
+  downloadCouponsReportPdf,
+  downloadFoodCompliancePdf
+} from '../../utils/pdfGenerator';
 
 interface AdminReportsTabProps {
   orders: Order[];
@@ -226,6 +233,48 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
           >
             <FileText className="w-3.5 h-3.5 text-emerald-800" />
             <span>Orders PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (storeSettings) {
+                downloadProductsCatalogPdf(products, storeSettings);
+              }
+            }}
+            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Download Product Catalog Sheet PDF"
+          >
+            <Package className="w-3.5 h-3.5 text-emerald-800" />
+            <span>Catalog PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (storeSettings) {
+                downloadCustomersReportPdf(orders, storeSettings);
+              }
+            }}
+            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Download Customer CRM Directory PDF"
+          >
+            <Users className="w-3.5 h-3.5 text-emerald-800" />
+            <span>Customers PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (storeSettings) {
+                downloadCouponsReportPdf(coupons, storeSettings);
+              }
+            }}
+            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Download Coupons & Discounts PDF"
+          >
+            <Ticket className="w-3.5 h-3.5 text-emerald-800" />
+            <span>Coupons PDF</span>
           </button>
 
           <button

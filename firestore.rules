@@ -55,6 +55,11 @@ service cloud.firestore {
       allow get, list, update, delete: if isAdmin();
     }
 
+    // Archived orders (Admin only archive storage):
+    match /archivedOrders/{orderId} {
+      allow read, write: if isAdmin() && isValidId(orderId);
+    }
+
     // Customer Order Tracking:
     // Direct single-document get requiring exact Order ID and 10-digit mobile number composite ID
     // Customers CANNOT list/scrape the tracking collection

@@ -24,7 +24,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   initialQuantity,
   onOrderSuccess,
 }) => {
-  const { storeSettings, createOrder } = useStore();
+  const { storeSettings, createOrder, orders } = useStore();
 
   const minQty = Math.max(1, storeSettings?.minOrderQuantity || 1);
   const maxQty = Math.max(minQty, storeSettings?.maxOrderQuantity || 20);
@@ -87,6 +87,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     quantity,
     settings: storeSettings,
     appliedCoupon,
+    productId: product.id,
+    customerPhone: phone,
   });
 
   const {
@@ -115,7 +117,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     const availableCoupons = storeSettings.coupons || [];
-    const validation = validateAndApplyCoupon(code, availableCoupons, baseAmount, product.id, phone);
+    let localOrders: any[] = [];
+    try {
+      const localOrdersRaw = localStorage.getItem('maknuts_my_orders');
+      localOrders = localOrdersRaw ? JSON.parse(localOrdersRaw) : [];
+    } catch {
+      // ignore
+    }
+    const allKnownOrders = [...(orders || []), ...localOrders];
+
+    const validation = validateAndApplyCoupon(
+      code,
+      availableCoupons,
+      baseAmount,
+      product.id,
+      phone,
+      allKnownOrders
+    );
 
     if (validation.isValid && validation.coupon) {
       setAppliedCoupon(validation.coupon);
@@ -249,6 +267,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         deliveryCharge,
         totalAmount,
         couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+        couponType: appliedCoupon ? appliedCoupon.discountType : undefined,
         couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
         paymentMethod,
         upiRefNumber: (paymentMethod === 'upi' && upiRefNumber.trim()) ? upiRefNumber.trim() : undefined,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Order, 
   Product, 
@@ -23,11 +23,22 @@ import {
   Plus,
   Search,
   Filter,
-  Download
+  Download,
+  FileText,
+  X,
+  ShieldCheck
 } from 'lucide-react';
 import { calculateReviewStats } from '../../utils/reviews';
 import { AdminTab } from './AdminSidebar';
-import { downloadStoreExecutiveReportPdf } from '../../utils/pdfGenerator';
+import { 
+  downloadStoreExecutiveReportPdf,
+  downloadOrderInvoicePdf,
+  downloadOrdersReportPdf,
+  downloadFoodCompliancePdf,
+  downloadProductsCatalogPdf,
+  downloadCustomersReportPdf,
+  downloadCouponsReportPdf
+} from '../../utils/pdfGenerator';
 
 interface AdminOverviewTabProps {
   orders: Order[];
@@ -46,6 +57,7 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
   onNavigateTab,
   onOpenOrder,
 }) => {
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   // Today's Date Calculation (IST or local)
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayOrders = orders.filter(o => o.createdAt && o.createdAt.startsWith(todayStr));
@@ -127,12 +139,12 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => downloadStoreExecutiveReportPdf(orders, products, storeSettings, storeSettings.coupons || [])}
-              className="px-3.5 py-2 bg-emerald-950/80 hover:bg-black text-amber-300 rounded-xl text-xs font-bold border border-amber-300/40 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
-              title="Download Comprehensive Executive Store Audit Report PDF"
+              onClick={() => setIsPdfModalOpen(true)}
+              className="px-3.5 py-2 bg-emerald-950/90 hover:bg-black text-amber-300 rounded-xl text-xs font-bold border border-amber-300/40 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+              title="Download Any Store Document or Audit Dossier in Beautiful PDF"
             >
               <Download className="w-3.5 h-3.5 text-amber-300" />
-              <span>Executive PDF</span>
+              <span>Download PDF Hub</span>
             </button>
           </div>
         </div>
@@ -420,16 +432,30 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenOrder(order);
-                        }}
-                        className="px-2.5 py-1 bg-stone-100 hover:bg-emerald-100 hover:text-emerald-900 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
-                      >
-                        Inspect
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadOrderInvoicePdf(order, storeSettings);
+                          }}
+                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title="Download Tax Invoice PDF"
+                        >
+                          <Download className="w-3 h-3 text-amber-700" />
+                          <span className="hidden sm:inline">Invoice</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenOrder(order);
+                          }}
+                          className="px-2.5 py-1 bg-stone-100 hover:bg-emerald-100 hover:text-emerald-900 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                          Inspect
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -438,6 +464,204 @@ export const AdminOverviewTab: React.FC<AdminOverviewTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* PDF HUB MODAL */}
+      {isPdfModalOpen && (
+        <div className="fixed inset-0 z-50 bg-stone-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-xl w-full border border-stone-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="p-5 bg-gradient-to-r from-emerald-950 via-emerald-900 to-stone-950 text-white flex items-center justify-between border-b border-emerald-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-400 text-stone-950 flex items-center justify-center font-bold">
+                  <Download className="w-5 h-5 text-stone-950" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base font-serif text-white">
+                    Store PDF Document Hub
+                  </h3>
+                  <p className="text-xs text-stone-300">
+                    Download beautifully branded official PDF documents on demand.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3 max-h-[75vh] overflow-y-auto">
+              <p className="text-xs text-stone-600">
+                Select any required report to immediately generate and download as a formatted A4 vector PDF:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* 1. Executive Audit Report */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadStoreExecutiveReportPdf(orders, products, storeSettings, storeSettings.coupons || []);
+                    setIsPdfModalOpen(false);
+                  }}
+                  className="p-3.5 rounded-2xl border border-stone-200 hover:border-emerald-600 hover:bg-emerald-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4" />
+                    </span>
+                    <Download className="w-3.5 h-3.5 text-stone-400 group-hover:text-emerald-700" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-stone-900 group-hover:text-emerald-950">
+                      Store Executive Audit PDF
+                    </h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      KPIs, sales revenue, payment split, inventory status & coupons.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 2. All Orders Detailed Report */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadOrdersReportPdf(orders, storeSettings, 'All Orders Detailed Audit Dossier');
+                    setIsPdfModalOpen(false);
+                  }}
+                  className="p-3.5 rounded-2xl border border-stone-200 hover:border-emerald-600 hover:bg-emerald-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center">
+                      <ShoppingCart className="w-4 h-4" />
+                    </span>
+                    <Download className="w-3.5 h-3.5 text-stone-400 group-hover:text-emerald-700" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-stone-900 group-hover:text-emerald-950">
+                      Detailed Orders Log PDF
+                    </h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      Complete transaction register ({orders.length} orders) with AWB tracking & totals.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 3. Product Catalog */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadProductsCatalogPdf(products, storeSettings);
+                    setIsPdfModalOpen(false);
+                  }}
+                  className="p-3.5 rounded-2xl border border-stone-200 hover:border-emerald-600 hover:bg-emerald-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                      <Package className="w-4 h-4" />
+                    </span>
+                    <Download className="w-3.5 h-3.5 text-stone-400 group-hover:text-emerald-700" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-stone-900 group-hover:text-emerald-950">
+                      Product Catalog & Stock PDF
+                    </h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      Official product list ({products.length} SKUs), MRP, weights, and availability.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 4. Customer Directory */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadCustomersReportPdf(orders, storeSettings);
+                    setIsPdfModalOpen(false);
+                  }}
+                  className="p-3.5 rounded-2xl border border-stone-200 hover:border-emerald-600 hover:bg-emerald-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="w-7 h-7 rounded-lg bg-purple-100 text-purple-800 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </span>
+                    <Download className="w-3.5 h-3.5 text-stone-400 group-hover:text-emerald-700" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-stone-900 group-hover:text-emerald-950">
+                      Customer CRM Directory PDF
+                    </h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      Buyer profiles, phone contacts, lifetime spends & delivery destinations.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 5. Coupons Registry */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadCouponsReportPdf(storeSettings.coupons || [], storeSettings);
+                    setIsPdfModalOpen(false);
+                  }}
+                  className="p-3.5 rounded-2xl border border-stone-200 hover:border-emerald-600 hover:bg-emerald-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="w-7 h-7 rounded-lg bg-rose-100 text-rose-800 flex items-center justify-center">
+                      <Ticket className="w-4 h-4" />
+                    </span>
+                    <Download className="w-3.5 h-3.5 text-stone-400 group-hover:text-emerald-700" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-stone-900 group-hover:text-emerald-950">
+                      Coupons & Promo Policies PDF
+                    </h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      Active and disabled promo codes, usage caps, and validity limits.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 6. Food Safety & FSSAI Compliance */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadFoodCompliancePdf(storeSettings, products);
+                    setIsPdfModalOpen(false);
+                  }}
+                  className="p-3.5 rounded-2xl border border-stone-200 hover:border-emerald-600 hover:bg-emerald-50/40 text-left transition-all cursor-pointer group flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="w-7 h-7 rounded-lg bg-teal-100 text-teal-800 flex items-center justify-center">
+                      <ShieldCheck className="w-4 h-4" />
+                    </span>
+                    <Download className="w-3.5 h-3.5 text-stone-400 group-hover:text-emerald-700" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs text-stone-900 group-hover:text-emerald-950">
+                      Food & FSSAI Compliance PDF
+                    </h4>
+                    <p className="text-[11px] text-stone-500 mt-0.5">
+                      FSSAI license, nutritional facts panel, statutory labels & claims.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-stone-50 border-t border-stone-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(false)}
+                className="px-4 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

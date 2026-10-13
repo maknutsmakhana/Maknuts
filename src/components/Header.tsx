@@ -4,7 +4,6 @@ import { Truck } from 'lucide-react';
 import maknutsLogo from '../assets/images/regenerated_image_1791357700332.png';
 
 interface HeaderProps {
-  onOpenAdmin?: () => void;
   onOpenTracking: () => void;
   onOpenPolicies: (type: 'terms' | 'privacy' | 'returns' | 'shipping') => void;
 }

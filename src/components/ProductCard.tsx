@@ -292,19 +292,34 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
               )}
             </div>
 
-            {/* Big Primary BUY NOW Button */}
-            <button
-              type="button"
-              onClick={() => onBuyNow(quantity)}
-              disabled={!product.inStock}
-              className="w-full py-3.5 sm:py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-800 hover:from-emerald-900 hover:to-emerald-900 active:scale-[0.99] text-white font-bold text-base sm:text-lg shadow-lg shadow-emerald-900/25 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border border-emerald-600/30"
-            >
-              <ShoppingBag className="w-5 h-5 text-amber-300" />
-              <span>{storeSettings.buttons.buyNow || 'Buy Now'}</span>
-              <span className="text-emerald-200 text-sm font-normal">
-                (₹{cardPricing.subtotal})
-              </span>
-            </button>
+            {/* Action CTA Buttons */}
+            <div className="space-y-2 pt-1">
+              {storeSettings.buttons?.enableBuyNow !== false && (
+                <button
+                  type="button"
+                  onClick={() => onBuyNow(quantity)}
+                  disabled={!product.inStock}
+                  className="w-full py-3.5 sm:py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-800 hover:from-emerald-900 hover:to-emerald-900 active:scale-[0.99] text-white font-bold text-base sm:text-lg shadow-lg shadow-emerald-900/25 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border border-emerald-600/30"
+                >
+                  <ShoppingBag className="w-5 h-5 text-amber-300" />
+                  <span>{storeSettings.buttons?.buyNow || 'Buy Now'}</span>
+                  <span className="text-emerald-200 text-sm font-normal">
+                    (₹{cardPricing.subtotal})
+                  </span>
+                </button>
+              )}
+
+              {storeSettings.buttons?.enableWhatsAppOrder !== false && (
+                <button
+                  type="button"
+                  onClick={handleDirectWhatsAppQuery}
+                  className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer border border-stone-200"
+                >
+                  <MessageCircle className="w-4 h-4 text-[#25D366]" />
+                  <span>{storeSettings.buttons?.whatsappOrder || 'Order via WhatsApp'}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

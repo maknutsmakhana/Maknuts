@@ -6,7 +6,12 @@ import { createWhatsAppUrl } from '../utils/whatsapp';
 export const FloatingWhatsApp: React.FC = () => {
   const { storeSettings } = useStore();
 
-  if (storeSettings.sectionVisibility?.floatingWhatsApp === false || storeSettings.whatsAppSettings?.enableFloatingButton === false) {
+  const isVisible = 
+    storeSettings.sectionVisibility?.floatingWhatsApp !== false && 
+    storeSettings.whatsAppSettings?.enableFloatingButton !== false && 
+    storeSettings.whatsAppSettings?.enabled !== false;
+
+  if (!isVisible) {
     return null;
   }
 
@@ -14,6 +19,11 @@ export const FloatingWhatsApp: React.FC = () => {
   const prompt = storeSettings.whatsAppSettings?.supportMessageTemplate 
     ? storeSettings.whatsAppSettings.supportMessageTemplate.replace('{customer_name}', 'Customer')
     : `Hi ${storeSettings.shopName}! I would like to order or ask a question about Maknuts Makhana.`;
+
+  const buttonLabel = 
+    storeSettings.whatsAppSettings?.floatingButtonText || 
+    storeSettings.buttons?.floatingWhatsApp || 
+    'Order on WhatsApp';
 
   const handleOpenWhatsApp = () => {
     const url = createWhatsAppUrl(phoneNum, prompt);
@@ -24,7 +34,7 @@ export const FloatingWhatsApp: React.FC = () => {
     <div className="fixed bottom-5 right-5 z-40 flex items-center group">
       {/* Floating Tooltip Label */}
       <div className="hidden sm:flex items-center mr-2 px-3 py-1.5 rounded-full bg-stone-900/90 text-white text-xs font-semibold shadow-lg backdrop-blur-xs opacity-90 group-hover:opacity-100 transition-opacity">
-        <span>Order on WhatsApp</span>
+        <span>{buttonLabel}</span>
       </div>
 
       {/* Floating Button */}
