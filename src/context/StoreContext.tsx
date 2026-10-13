@@ -360,13 +360,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
           // Self-heal: If document was saved without comment, update Firestore asynchronously with preserved comment
           if (!rawComment && fallbackComment && adminUser) {
-            setDoc(d.ref, {
+            setDoc(d.ref, sanitizeForFirestore({
               comment: fallbackComment,
               message: fallbackComment,
               name: effectiveName,
               rating: effectiveRating,
               status: effectiveStatus,
-            }, { merge: true }).catch(() => {});
+            }), { merge: true }).catch(() => {});
           }
 
           reviewList.push({

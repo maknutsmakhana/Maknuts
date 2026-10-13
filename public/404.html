@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirecting...</title>
+    <script>
+      (function() {
+        var path = window.location.pathname;
+        if (path === '/admin' || path.startsWith('/admin') || path === '/backend' || path.startsWith('/backend')) {
+          window.location.replace('/#admin');
+        } else {
+          window.location.replace('/' + (window.location.search || '') + (window.location.hash || ''));
+        }
+      })();
+    </script>
+  </head>
+  <body style="font-family: sans-serif; background: #FAF8F5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; color: #292524;">
+    <div style="text-align: center;">
+      <h2 style="color: #064e3b; margin-bottom: 8px;">Redirecting to Admin...</h2>
+      <p style="color: #78716c; font-size: 14px;">If you are not redirected automatically, <a href="/#admin" style="color: #064e3b; font-weight: bold;">click here</a>.</p>
+    </div>
+  </body>
+</html>
