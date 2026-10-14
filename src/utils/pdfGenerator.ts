@@ -486,7 +486,7 @@ export const downloadStoreExecutiveReportPdf = (
 /**
  * Download Complete Food, FSSAI & Product Compliance Catalog PDF
  */
-export const downloadFoodCompliancePdf = (store: StoreSettings, products: Product[]) => {
+export const downloadFoodCompliancePdf = (store: StoreSettings, products: Product[] = []) => {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',

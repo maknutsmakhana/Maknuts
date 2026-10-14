@@ -274,9 +274,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         note: note.trim() ? note.trim() : '',
       });
 
-      // 2. Format WhatsApp message and URL
-      const message = generateOrderWhatsAppMessage(order, storeSettings.shopName);
-      const whatsappUrl = createWhatsAppUrl(storeSettings.whatsappNumber, message);
+      // 2. Format WhatsApp message using Admin configured template and URL
+      const customTemplate = storeSettings.whatsAppSettings?.orderTemplate;
+      const message = generateOrderWhatsAppMessage(order, storeSettings.shopName, customTemplate);
+      const targetPhone = storeSettings.whatsAppSettings?.businessNumber || storeSettings.whatsappNumber;
+      const whatsappUrl = createWhatsAppUrl(targetPhone, message);
 
       // 3. Requirement 14: Open WhatsApp only ONCE after the order is successfully created
       try {

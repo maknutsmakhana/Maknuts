@@ -20,8 +20,10 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
 
   if (!order) return null;
 
-  const orderMessage = generateOrderWhatsAppMessage(order, storeSettings.shopName);
-  const whatsappUrl = createWhatsAppUrl(storeSettings.whatsappNumber, orderMessage);
+  const customTemplate = storeSettings.whatsAppSettings?.orderTemplate;
+  const orderMessage = generateOrderWhatsAppMessage(order, storeSettings.shopName, customTemplate);
+  const targetPhone = storeSettings.whatsAppSettings?.businessNumber || storeSettings.whatsappNumber;
+  const whatsappUrl = createWhatsAppUrl(targetPhone, orderMessage);
 
   const handleCopyMessage = () => {
     navigator.clipboard.writeText(orderMessage);

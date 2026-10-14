@@ -11,7 +11,8 @@ export const FaqSection: React.FC = () => {
     return null;
   }
 
-  const faqs = storeSettings.faqs || [];
+  const allFaqs = storeSettings.faqs || [];
+  const faqs = allFaqs.filter(faq => faq.visible !== false);
   if (faqs.length === 0) return null;
 
   const toggleFaq = (id: string) => {
@@ -71,17 +72,22 @@ export const FaqSection: React.FC = () => {
       </div>
 
       {/* Still need help callout */}
-      <div className="mt-6 pt-5 border-t border-stone-200/80 text-center flex flex-col sm:flex-row items-center justify-center gap-2 text-xs text-stone-500">
-        <span>Still have queries?</span>
-        <button
-          type="button"
-          onClick={handleWhatsAppHelp}
-          className="text-emerald-800 hover:text-emerald-950 font-bold flex items-center gap-1 hover:underline cursor-pointer"
-        >
-          <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Chat with us on WhatsApp ({storeSettings.whatsappNumber})</span>
-        </button>
-      </div>
+      {storeSettings.faqShowContactCallout !== false && (
+        <div className="mt-8 pt-6 border-t border-stone-200/80 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-stone-600 bg-stone-50/70 sm:bg-stone-50/50 p-4 rounded-2xl border border-stone-200/60 shadow-2xs">
+          <div className="flex items-center gap-2 text-stone-600">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="font-medium">{storeSettings.faqContactCalloutText || 'Still have queries?'}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleWhatsAppHelp}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold rounded-full shadow-xs hover:shadow-sm transition-all duration-200 cursor-pointer text-xs"
+          >
+            <MessageCircle className="w-3.5 h-3.5 text-emerald-300" />
+            <span>{storeSettings.faqContactButtonText || `Chat with us on WhatsApp (${storeSettings.whatsappNumber})`}</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

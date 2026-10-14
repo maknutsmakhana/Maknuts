@@ -14,6 +14,7 @@ export interface Product {
   images?: string[]; // Additional product photos gallery
   inStock: boolean;
   stockCount?: number;
+  lowStockThreshold?: number;
   stockStatusText?: string;
   minQuantity?: number;
   maxQuantity?: number;
@@ -22,6 +23,9 @@ export interface Product {
   isBestseller?: boolean;
   highlights?: string[];
   deliveryCharge?: number; // -1 or undefined for default store delivery
+  altText?: string;
+  imageOrder?: string[];
+  foodCompliance?: FoodComplianceSettings;
 }
 
 export interface Coupon {
@@ -143,6 +147,7 @@ export interface FaqItem {
   id: string;
   question: string;
   answer: string;
+  visible?: boolean;
 }
 
 export interface SocialLinksSettings {
@@ -157,28 +162,27 @@ export interface SeoSettings {
   pageTitle?: string;
   metaDescription?: string;
   keywords?: string;
-  socialShareTitle?: string;
-  socialShareImage?: string;
-  productSeoTitle?: string;
-  productDescription?: string;
-  imageAltText?: string;
+  canonicalUrl?: string;
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
+  twitterCard?: 'summary' | 'summary_large_image';
+  productSeoTitle?: string;
+  productDescription?: string;
+  imageAltText?: string;
 }
 
 export interface WhatsAppSettings {
-  phoneNumber?: string;
   businessNumber?: string;
-  orderMessageTemplate?: string;
+  supportNumber?: string;
   orderTemplate?: string;
-  paymentConfirmationTemplate?: string;
   paymentTemplate?: string;
-  supportMessageTemplate?: string;
   supportTemplate?: string;
-  enableFloatingButton?: boolean;
-  enabled?: boolean;
+  supportMessageTemplate?: string;
   floatingButtonText?: string;
+  enabled?: boolean;
+  enableFloatingButton?: boolean;
+  phoneNumber?: string; // backwards compatibility alias
 }
 
 export interface FlashOfferSettings {
@@ -326,6 +330,9 @@ export interface StoreSettings {
   foodComplianceSectionSubtitle?: string;
   faqSectionTitle?: string;
   faqSectionSubtitle?: string;
+  faqShowContactCallout?: boolean;
+  faqContactCalloutText?: string;
+  faqContactButtonText?: string;
   contactSectionTitle?: string;
   contactSectionSubtitle?: string;
   heroSection?: HeroSectionSettings;

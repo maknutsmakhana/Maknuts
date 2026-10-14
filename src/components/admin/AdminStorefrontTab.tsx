@@ -41,17 +41,25 @@ interface AdminStorefrontTabProps {
   settings: StoreSettings;
   onSaveSettings: (updated: Partial<StoreSettings>) => Promise<void>;
   onPreviewStorefront: () => void;
+  initialSection?: string;
 }
 
 export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
   settings,
   onSaveSettings,
   onPreviewStorefront,
+  initialSection,
 }) => {
   const [form, setForm] = useState<StoreSettings>({ ...settings });
   const [isSaving, setIsSaving] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
-  const [activeSectionEditor, setActiveSectionEditor] = useState<string>('hero');
+  const [activeSectionEditor, setActiveSectionEditor] = useState<string>(initialSection || 'hero');
+
+  React.useEffect(() => {
+    if (initialSection) {
+      setActiveSectionEditor(initialSection);
+    }
+  }, [initialSection]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -199,6 +207,7 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
       id: 'faq-' + Date.now(),
       question: 'New Question',
       answer: 'Answer description goes here.',
+      visible: true,
     };
     setForm({
       ...form,
@@ -206,10 +215,17 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
     });
   };
 
-  const handleUpdateFaq = (id: string, question: string, answer: string) => {
+  const handleUpdateFaq = (id: string, question: string, answer: string, visible?: boolean) => {
     setForm({
       ...form,
-      faqs: faqs.map(f => f.id === id ? { ...f, question, answer } : f),
+      faqs: faqs.map(f => f.id === id ? { ...f, question, answer, visible: visible !== undefined ? visible : (f.visible !== false) } : f),
+    });
+  };
+
+  const handleToggleFaqVisible = (id: string) => {
+    setForm({
+      ...form,
+      faqs: faqs.map(f => f.id === id ? { ...f, visible: f.visible === false ? true : false } : f),
     });
   };
 
@@ -1090,15 +1106,156 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
         {/* 8. FAQ SECTION */}
         {activeSectionEditor === 'faq' && (
           <div className="space-y-4 animate-in fade-in">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-900">FAQ Section & Questions</span>
+            {/* Master Storefront Visibility Banner */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              form.sectionVisibility?.faqSection !== false
+                ? 'bg-emerald-50/70 border-emerald-200'
+                : 'bg-stone-100/90 border-stone-300'
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    form.sectionVisibility?.faqSection !== false
+                      ? 'bg-emerald-800 text-white shadow-xs'
+                      : 'bg-stone-300 text-stone-600'
+                  }`}>
+                    <HelpCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-stone-900">
+                        Show FAQ Accordion on Storefront
+                      </h4>
+                      <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                        form.sectionVisibility?.faqSection !== false
+                          ? 'bg-emerald-200 text-emerald-900'
+                          : 'bg-stone-200 text-stone-600'
+                      }`}>
+                        {form.sectionVisibility?.faqSection !== false ? 'Live & Shown' : 'Hidden from Store'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Toggle whether the Frequently Asked Questions accordion section is displayed to customers on the live storefront.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Master Toggle Button */}
+                <div className="flex items-center gap-3 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextVal = !(form.sectionVisibility?.faqSection !== false);
+                      setForm({
+                        ...form,
+                        sectionVisibility: {
+                          ...(form.sectionVisibility || {}),
+                          faqSection: nextVal,
+                        },
+                      });
+                    }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      form.sectionVisibility?.faqSection !== false
+                        ? 'bg-emerald-800 text-white shadow-xs hover:bg-emerald-900'
+                        : 'bg-stone-300 text-stone-700 hover:bg-stone-400/80'
+                    }`}
+                  >
+                    {form.sectionVisibility?.faqSection !== false ? (
+                      <>
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>FAQ Section is Shown</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5" />
+                        <span>FAQ Section is Hidden</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Sub-banner: Still Have Questions Callout Toggle (WhatsApp specialist) */}
+            <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200/90 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-stone-800">
+                      Show &ldquo;Still have queries? Specialist Chat&rdquo; Callout
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                      form.faqShowContactCallout !== false
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-stone-200 text-stone-600'
+                    }`}>
+                      {form.faqShowContactCallout !== false ? 'Callout Shown' : 'Callout Hidden'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    Interactive WhatsApp contact strip placed right below the FAQ question list.
+                  </p>
+                </div>
+
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-stone-700 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={form.faqShowContactCallout !== false}
+                    onChange={e => setForm({
+                      ...form,
+                      faqShowContactCallout: e.target.checked
+                    })}
+                    className="w-4 h-4 accent-emerald-800 rounded"
+                  />
+                  <span>{form.faqShowContactCallout !== false ? 'Shown at bottom' : 'Hidden'}</span>
+                </label>
+              </div>
+
+              {form.faqShowContactCallout !== false && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-stone-200/80">
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase mb-1">
+                      Callout Question / Prompt
+                    </label>
+                    <input
+                      type="text"
+                      value={form.faqContactCalloutText || 'Still have queries?'}
+                      onChange={e => setForm({ ...form, faqContactCalloutText: e.target.value })}
+                      placeholder="Still have queries?"
+                      className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-medium text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-700/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-stone-500 uppercase mb-1">
+                      WhatsApp Specialist Button Text
+                    </label>
+                    <input
+                      type="text"
+                      value={form.faqContactButtonText || 'Chat with Makhana Specialist'}
+                      onChange={e => setForm({ ...form, faqContactButtonText: e.target.value })}
+                      placeholder="Chat with Makhana Specialist"
+                      className="w-full px-2.5 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-medium text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-700/20"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Header with Title Inputs and Add FAQ */}
+            <div className="flex items-center justify-between pt-1">
+              <div>
+                <span className="text-xs font-bold text-emerald-900 block">FAQ Section Headings & Question Entries</span>
+                <span className="text-[11px] text-stone-500">
+                  {faqs.filter(f => f.visible !== false).length} of {faqs.length} questions visible on storefront
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={handleAddFaq}
                 className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add FAQ</span>
+                <span>Add Question</span>
               </button>
             </div>
 
@@ -1128,27 +1285,69 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
               </div>
             </div>
 
+            {/* Questions List */}
             <div className="space-y-3 pt-1">
               {faqs.map((faq, idx) => (
-                <div key={faq.id} className="p-3.5 bg-stone-50 rounded-xl border border-stone-200 space-y-2">
+                <div 
+                  key={faq.id} 
+                  className={`p-3.5 rounded-xl border space-y-2 transition-all ${
+                    faq.visible !== false
+                      ? 'bg-stone-50 border-stone-200'
+                      : 'bg-stone-100/60 border-stone-300/80 opacity-80'
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-bold uppercase text-stone-400">
-                      Question #{idx + 1}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteFaq(faq.id)}
-                      className="text-stone-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
-                      title="Delete question"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase text-stone-400">
+                        Question #{idx + 1}
+                      </span>
+                      {faq.visible === false && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                          Hidden
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Individual Question Show/Hide Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFaqVisible(faq.id)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                          faq.visible !== false
+                            ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
+                            : 'bg-stone-200 text-stone-700 hover:bg-stone-300'
+                        }`}
+                        title={faq.visible !== false ? 'Visible on storefront. Click to hide.' : 'Hidden from storefront. Click to show.'}
+                      >
+                        {faq.visible !== false ? (
+                          <>
+                            <Eye className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>Shown</span>
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5 text-stone-500" />
+                            <span>Hidden</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFaq(faq.id)}
+                        className="text-stone-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
+                        title="Delete question"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   <input
                     type="text"
                     value={faq.question}
-                    onChange={e => handleUpdateFaq(faq.id, e.target.value, faq.answer)}
+                    onChange={e => handleUpdateFaq(faq.id, e.target.value, faq.answer, faq.visible)}
                     placeholder="Question"
                     className="w-full px-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs font-bold text-stone-900 focus:outline-none"
                   />
@@ -1156,7 +1355,7 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
                   <textarea
                     rows={2}
                     value={faq.answer}
-                    onChange={e => handleUpdateFaq(faq.id, faq.question, e.target.value)}
+                    onChange={e => handleUpdateFaq(faq.id, faq.question, e.target.value, faq.visible)}
                     placeholder="Detailed Answer"
                     className="w-full px-3 py-1.5 bg-white border border-stone-300 rounded-lg text-xs text-stone-700 focus:outline-none"
                   />

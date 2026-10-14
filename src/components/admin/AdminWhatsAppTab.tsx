@@ -26,8 +26,8 @@ export const AdminWhatsAppTab: React.FC<AdminWhatsAppTabProps> = ({
     ...(settings.whatsAppSettings || {
       enabled: true,
       businessNumber: settings.whatsappNumber || '919876543210',
-      orderTemplate: 'Hello {customerName}! Thank you for choosing Maknuts Makhana. Your Order #{orderNumber} for {items} (Total: ₹{amount}) is confirmed! Payment: {paymentMethod}. We will dispatch shortly.',
-      paymentTemplate: 'Hi {customerName}, we have received your payment of ₹{amount} for Order #{orderNumber}. Your fresh harvest Makhana is scheduled for dispatch.',
+      orderTemplate: 'Hello {{customerName}}! Thank you for choosing Maknuts Makhana. Your Order #{{orderId}} for (Total: ₹{{amount}}) is confirmed! Payment: {{paymentMethod}}. Track live at {{trackingUrl}}. Support: {{supportPhone}}.',
+      paymentTemplate: 'Hi {{customerName}}, we have received your payment of ₹{{amount}} for Order #{{orderId}}. Your fresh harvest Makhana is scheduled for dispatch. Support: {{supportPhone}}.',
       supportTemplate: 'Hello Maknuts Support! I have a question regarding an order or product quality.',
     })
   });
@@ -190,7 +190,7 @@ export const AdminWhatsAppTab: React.FC<AdminWhatsAppTabProps> = ({
             Automated Message Templates
           </h3>
           <span className="text-[10px] text-stone-500 font-mono">
-            Placeholders: {'{customerName}'}, {'{orderNumber}'}, {'{items}'}, {'{amount}'}, {'{paymentMethod}'}
+            Placeholders: {'{{orderId}}'}, {'{{customerName}}'}, {'{{amount}}'}, {'{{paymentMethod}}'}, {'{{trackingUrl}}'}, {'{{supportPhone}}'}
           </span>
         </div>
 

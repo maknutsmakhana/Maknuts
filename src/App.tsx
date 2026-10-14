@@ -20,6 +20,7 @@ import { PhotoGallery } from './components/PhotoGallery';
 import { ReviewsSection } from './components/ReviewsSection';
 import { GalleryAndReviewsHub } from './components/GalleryAndReviewsHub';
 import { ContactSection } from './components/ContactSection';
+import { StoreSeoHead } from './components/StoreSeoHead';
 import { Order, SectionVisibility } from './types';
 
 function StoreFront() {
@@ -53,26 +54,7 @@ function StoreFront() {
   const [trackingPhone, setTrackingPhone] = useState('');
   const [activePolicy, setActivePolicy] = useState<'terms' | 'privacy' | 'returns' | 'shipping' | 'cancellation' | null>(null);
 
-  // Dynamic SEO Synchronization & Admin Backend Title
-  useEffect(() => {
-    if (isAdminOpen) {
-      document.title = `${storeSettings.shopName || 'Maknuts'} — Admin Control Center`;
-      return;
-    }
 
-    if (storeSettings.seo?.pageTitle) {
-      document.title = storeSettings.seo.pageTitle;
-    } else if (storeSettings.shopName) {
-      document.title = `${storeSettings.shopName} — ${storeSettings.tagline || '100% Pure Jumbo Makhana'}`;
-    }
-
-    if (storeSettings.seo?.metaDescription) {
-      const meta = document.querySelector('meta[name="description"]');
-      if (meta) {
-        meta.setAttribute('content', storeSettings.seo.metaDescription);
-      }
-    }
-  }, [isAdminOpen, storeSettings.seo, storeSettings.shopName, storeSettings.tagline]);
 
   // URL & Route listener for admin backend (/admin) & tracking (#track=...)
   useEffect(() => {
@@ -143,6 +125,13 @@ function StoreFront() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-stone-800 flex flex-col font-sans selection:bg-amber-200 selection:text-emerald-950">
+      {/* Dynamic SEO Meta, OpenGraph, Canonical & Schema.org JSON-LD */}
+      <StoreSeoHead
+        settings={storeSettings}
+        activeProduct={activeProduct}
+        isAdminOpen={isAdminOpen}
+      />
+
       {/* Top Notification Banner with Track Link */}
       {visibility.announcementBar !== false && (
         <Banner onOpenTracking={() => handleOpenTrackingWithQuery('')} />
