@@ -27,6 +27,7 @@ interface MarketingPageProps {
   products: Product[];
   onSaveSettings: (updated: Partial<StoreSettings>) => Promise<void>;
   initialSubTab?: string;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const MarketingPage: React.FC<MarketingPageProps> = ({
@@ -34,10 +35,22 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
   products,
   onSaveSettings,
   initialSubTab = 'whatsapp',
+  onSubTabChange,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'whatsapp' | 'seo' | 'social' | 'structured_data'>(
     (initialSubTab as any) || 'whatsapp'
   );
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab as any);
+    }
+  }, [initialSubTab]);
+
+  const handleSubTabChange = (tab: 'whatsapp' | 'seo' | 'social' | 'structured_data') => {
+    setActiveSubTab(tab);
+    onSubTabChange?.(tab);
+  };
 
   // 1. WhatsApp Form
   const [businessNumber, setBusinessNumber] = useState(
@@ -186,7 +199,7 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveSubTab(tab.id as any)}
+              onClick={() => handleSubTabChange(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
                 activeSubTab === tab.id
                   ? 'bg-emerald-800 text-white shadow-2xs'

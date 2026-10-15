@@ -318,7 +318,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               {isActive && section.subItems.length > 0 && (
                 <div className="pl-7 pr-2 py-1 space-y-0.5 border-l-2 border-emerald-700/40 ml-4 animate-in fade-in duration-150">
                   {section.subItems.map((sub) => {
-                    const isSubActive = activeSubTab === sub.id || (!activeSubTab && sub.id === section.subItems[0]?.id);
+                    const isSubActive = 
+                      activeSubTab === sub.id || 
+                      (sub.id === 'homepage' && activeSubTab === 'hero') ||
+                      (sub.id === 'orders' && activeSubTab === 'all') ||
+                      (!activeSubTab && sub.id === section.subItems[0]?.id);
 
                     return (
                       <button

@@ -99,44 +99,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
       case 'storefront':
       case 'faq':
         setActivePrimaryTab('storefront');
-        setActiveSubTab(tab === 'faq' ? 'faq' : (subTab || 'homepage'));
+        setActiveSubTab(subTab || (tab === 'faq' ? 'faq' : 'homepage'));
         break;
       case 'catalog':
       case 'products':
       case 'inventory':
       case 'media':
         setActivePrimaryTab('catalog');
-        setActiveSubTab(tab === 'catalog' ? (subTab || 'products') : tab);
+        setActiveSubTab(subTab || (tab === 'catalog' ? 'products' : tab));
         break;
       case 'pricing_promotions':
       case 'pricing':
       case 'coupons':
         setActivePrimaryTab('pricing_promotions');
-        setActiveSubTab(tab === 'pricing_promotions' ? (subTab || 'pricing') : tab);
+        setActiveSubTab(subTab || (tab === 'pricing_promotions' ? 'pricing' : tab));
         break;
       case 'orders_payments':
       case 'orders':
       case 'payments':
         setActivePrimaryTab('orders_payments');
-        setActiveSubTab(tab === 'orders_payments' ? (subTab || 'orders') : tab);
+        setActiveSubTab(subTab || (tab === 'orders_payments' ? 'orders' : tab));
         break;
       case 'customers_reviews':
       case 'customers':
       case 'reviews':
         setActivePrimaryTab('customers_reviews');
-        setActiveSubTab(tab === 'customers_reviews' ? (subTab || 'customers') : tab);
+        setActiveSubTab(subTab || (tab === 'customers_reviews' ? 'customers' : tab));
         break;
       case 'marketing':
       case 'whatsapp':
       case 'seo':
         setActivePrimaryTab('marketing');
-        setActiveSubTab(tab === 'marketing' ? (subTab || 'whatsapp') : tab);
+        setActiveSubTab(subTab || (tab === 'marketing' ? 'whatsapp' : tab));
         break;
       case 'compliance':
       case 'food_compliance':
       case 'policies':
         setActivePrimaryTab('compliance');
-        setActiveSubTab(tab === 'compliance' ? (subTab || 'business_fssai') : tab === 'policies' ? 'policies' : 'business_fssai');
+        setActiveSubTab(subTab || (tab === 'policies' ? 'policies' : 'business_fssai'));
         break;
       case 'reports':
         setActivePrimaryTab('reports');
@@ -498,6 +498,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     setSelectedOrderForModal(order);
                     handleNavigate('orders_payments', 'orders');
                   }}
+                  activeSubTab={activeSubTab}
                 />
               )}
 
@@ -505,11 +506,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
               {activePrimaryTab === 'storefront' && (
                 <AdminStorefrontTab
                   settings={storeSettings}
-                  initialSection={activeSubTab === 'faq' ? 'faq' : undefined}
+                  initialSection={activeSubTab}
                   onSaveSettings={async (updated) => {
                     await updateSettings(updated);
                   }}
                   onPreviewStorefront={onClose}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
 
@@ -524,6 +526,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   onUpdateProduct={updateProduct}
                   onDeleteProduct={deleteProduct}
                   initialSubTab={activeSubTab}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
 
@@ -540,6 +543,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                     handleNavigate('orders_payments', 'orders');
                   }}
                   initialSubTab={activeSubTab}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
 
@@ -556,6 +560,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   onClearAllOrders={clearAllOrders}
                   initialTab={activeSubTab}
                   initialSelectedOrder={selectedOrderForModal}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
 
@@ -571,6 +576,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   onUpdateReviewText={updateReviewText}
                   onUpdateStoreReply={updateStoreReply}
                   initialSubTab={activeSubTab}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
 
@@ -581,6 +587,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   products={products}
                   onSaveSettings={updateSettings}
                   initialSubTab={activeSubTab}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
 
@@ -590,6 +597,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   settings={storeSettings}
                   onSaveSettings={updateSettings}
                   initialSubTab={activeSubTab}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
 
@@ -616,6 +624,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   onImportData={importData}
                   onResetDefaults={resetToDefaults}
                   initialSubTab={activeSubTab}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
             </main>

@@ -23,6 +23,7 @@ interface SystemPageProps {
   onImportData: (json: string) => Promise<boolean>;
   onResetDefaults: () => Promise<void>;
   initialSubTab?: string;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const SystemPage: React.FC<SystemPageProps> = ({
@@ -33,10 +34,22 @@ export const SystemPage: React.FC<SystemPageProps> = ({
   onImportData,
   onResetDefaults,
   initialSubTab = 'account',
+  onSubTabChange,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'account' | 'firebase' | 'app_info' | 'backup' | 'security'>(
     (initialSubTab as any) || 'account'
   );
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab as any);
+    }
+  }, [initialSubTab]);
+
+  const handleSubTabChange = (tab: 'account' | 'firebase' | 'app_info' | 'backup' | 'security') => {
+    setActiveSubTab(tab);
+    onSubTabChange?.(tab);
+  };
 
   const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [importJson, setImportJson] = useState('');
@@ -107,7 +120,7 @@ export const SystemPage: React.FC<SystemPageProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveSubTab(tab.id as any)}
+              onClick={() => handleSubTabChange(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
                 activeSubTab === tab.id
                   ? 'bg-emerald-800 text-white shadow-2xs'

@@ -43,6 +43,7 @@ interface CatalogPageProps {
   onUpdateProduct: (prod: Product) => Promise<void>;
   onDeleteProduct: (id: string) => Promise<void>;
   initialSubTab?: string;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const CatalogPage: React.FC<CatalogPageProps> = ({
@@ -54,10 +55,22 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
   onUpdateProduct,
   onDeleteProduct,
   initialSubTab = 'products',
+  onSubTabChange,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'products' | 'inventory' | 'media' | 'food_fssai'>(
     (initialSubTab as any) || 'products'
   );
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab as any);
+    }
+  }, [initialSubTab]);
+
+  const handleSubTabChange = (tab: 'products' | 'inventory' | 'media' | 'food_fssai') => {
+    setActiveSubTab(tab);
+    onSubTabChange?.(tab);
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -304,7 +317,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveSubTab(tab.id as any)}
+              onClick={() => handleSubTabChange(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
                 activeSubTab === tab.id
                   ? 'bg-emerald-800 text-white shadow-2xs'

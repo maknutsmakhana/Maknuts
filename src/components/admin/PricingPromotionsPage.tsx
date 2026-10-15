@@ -29,6 +29,7 @@ interface PricingPromotionsPageProps {
   onUpdateProduct: (prod: Product) => Promise<void>;
   onOpenOrder: (order: Order) => void;
   initialSubTab?: string;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const PricingPromotionsPage: React.FC<PricingPromotionsPageProps> = ({
@@ -39,10 +40,22 @@ export const PricingPromotionsPage: React.FC<PricingPromotionsPageProps> = ({
   onUpdateProduct,
   onOpenOrder,
   initialSubTab = 'pricing',
+  onSubTabChange,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'pricing' | 'discounts' | 'delivery' | 'coupons' | 'scheduled_offers'>(
     (initialSubTab as any) || 'pricing'
   );
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab as any);
+    }
+  }, [initialSubTab]);
+
+  const handleSubTabChange = (tab: 'pricing' | 'discounts' | 'delivery' | 'coupons' | 'scheduled_offers') => {
+    setActiveSubTab(tab);
+    onSubTabChange?.(tab);
+  };
 
   const [deliveryCharge, setDeliveryCharge] = useState(settings.deliveryCharge ?? 40);
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(settings.freeDeliveryThreshold ?? 600);
@@ -141,7 +154,7 @@ export const PricingPromotionsPage: React.FC<PricingPromotionsPageProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveSubTab(tab.id as any)}
+              onClick={() => handleSubTabChange(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
                 activeSubTab === tab.id
                   ? 'bg-emerald-800 text-white shadow-2xs'

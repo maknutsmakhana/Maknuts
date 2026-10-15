@@ -45,6 +45,7 @@ interface OrdersPaymentsPageProps {
   onClearAllOrders: () => Promise<void>;
   initialTab?: string;
   initialSelectedOrder?: Order | null;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
@@ -58,10 +59,29 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
   onClearAllOrders,
   initialTab = 'all',
   initialSelectedOrder = null,
+  onSubTabChange,
 }) => {
+  const mapInitialTab = (tab?: string) => {
+    if (!tab) return 'all';
+    if (tab === 'orders') return 'all';
+    if (tab === 'payments') return 'upi_verification';
+    return tab;
+  };
+
   const [activeTab, setActiveTab] = useState<
     'all' | 'Pending' | 'Confirmed' | 'Shipped' | 'Delivered' | 'Cancelled' | 'upi_verification' | 'cod' | 'refunds' | 'shipping_tracking' | 'invoices' | 'archive'
-  >((initialTab as any) || 'all');
+  >((mapInitialTab(initialTab) as any) || 'all');
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(mapInitialTab(initialTab) as any);
+    }
+  }, [initialTab]);
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId as any);
+    onSubTabChange?.(tabId);
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(initialSelectedOrder);
@@ -255,7 +275,7 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => handleTabChange(tab.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
                 activeTab === tab.id
                   ? 'bg-emerald-800 text-white shadow-2xs'

@@ -23,16 +23,29 @@ interface CompliancePageProps {
   settings: StoreSettings;
   onSaveSettings: (updated: Partial<StoreSettings>) => Promise<void>;
   initialSubTab?: string;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const CompliancePage: React.FC<CompliancePageProps> = ({
   settings,
   onSaveSettings,
   initialSubTab = 'business_fssai',
+  onSubTabChange,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'business_fssai' | 'policies' | 'legal_info'>(
     (initialSubTab as any) || 'business_fssai'
   );
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab as any);
+    }
+  }, [initialSubTab]);
+
+  const handleSubTabChange = (tab: 'business_fssai' | 'policies' | 'legal_info') => {
+    setActiveSubTab(tab);
+    onSubTabChange?.(tab);
+  };
 
   const [businessName, setBusinessName] = useState(
     settings.foodCompliance?.marketerName || 'Maknuts Agri Foods'
@@ -146,7 +159,7 @@ export const CompliancePage: React.FC<CompliancePageProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveSubTab(tab.id as any)}
+              onClick={() => handleSubTabChange(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
                 activeSubTab === tab.id
                   ? 'bg-emerald-800 text-white shadow-2xs'

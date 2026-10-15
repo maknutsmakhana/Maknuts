@@ -38,6 +38,7 @@ interface CustomersReviewsPageProps {
   onUpdateReviewText: (id: string, newComment: string) => Promise<void>;
   onUpdateStoreReply: (id: string, replyText: string | null) => Promise<void>;
   initialSubTab?: string;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const CustomersReviewsPage: React.FC<CustomersReviewsPageProps> = ({
@@ -50,10 +51,22 @@ export const CustomersReviewsPage: React.FC<CustomersReviewsPageProps> = ({
   onUpdateReviewText,
   onUpdateStoreReply,
   initialSubTab = 'customers',
+  onSubTabChange,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'customers' | 'reviews' | 'pending_reviews'>(
     (initialSubTab as any) || 'customers'
   );
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab as any);
+    }
+  }, [initialSubTab]);
+
+  const handleSubTabChange = (tab: 'customers' | 'reviews' | 'pending_reviews') => {
+    setActiveSubTab(tab);
+    onSubTabChange?.(tab);
+  };
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [reviewSearch, setReviewSearch] = useState('');
@@ -183,7 +196,7 @@ export const CustomersReviewsPage: React.FC<CustomersReviewsPageProps> = ({
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveSubTab(tab.id as any)}
+              onClick={() => handleSubTabChange(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-1.5 ${
                 activeSubTab === tab.id
                   ? 'bg-emerald-800 text-white shadow-2xs'

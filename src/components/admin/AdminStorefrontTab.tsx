@@ -42,6 +42,7 @@ interface AdminStorefrontTabProps {
   onSaveSettings: (updated: Partial<StoreSettings>) => Promise<void>;
   onPreviewStorefront: () => void;
   initialSection?: string;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
@@ -49,17 +50,38 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
   onSaveSettings,
   onPreviewStorefront,
   initialSection,
+  onSubTabChange,
 }) => {
+  const mapSection = (sec?: string): string => {
+    if (!sec) return 'hero';
+    if (sec === 'homepage') return 'hero';
+    if (sec === 'sections') return 'sections';
+    return sec;
+  };
+
   const [form, setForm] = useState<StoreSettings>({ ...settings });
   const [isSaving, setIsSaving] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
-  const [activeSectionEditor, setActiveSectionEditor] = useState<string>(initialSection || 'hero');
+  const [activeSectionEditor, setActiveSectionEditor] = useState<string>(mapSection(initialSection));
 
   React.useEffect(() => {
     if (initialSection) {
-      setActiveSectionEditor(initialSection);
+      const mapped = mapSection(initialSection);
+      if (mapped === 'sections') {
+        const el = document.getElementById('storefront-sections-card');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        setActiveSectionEditor(mapped);
+        const el = document.getElementById('storefront-content-card');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
   }, [initialSection]);
+
+  const handleSelectEditor = (id: string) => {
+    setActiveSectionEditor(id);
+    onSubTabChange?.(id);
+  };
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -327,7 +349,7 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
       </div>
 
       {/* SECTION 1: DYNAMIC SECTION REORDERING & VISIBILITY */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-2xs space-y-4">
+      <div id="storefront-sections-card" className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
           <div>
             <h3 className="text-sm font-bold text-stone-900 font-serif flex items-center gap-2">
@@ -438,7 +460,7 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
       </div>
 
       {/* SECTION 2: EDIT SECTION TITLES, SUBTITLES & CONTENT */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-2xs space-y-4">
+      <div id="storefront-content-card" className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200/90 shadow-2xs space-y-4">
         <div className="border-b border-stone-100 pb-3">
           <h3 className="text-sm font-bold text-stone-900 font-serif">
             Edit Section Titles, Subtitles, Banners & Buttons
@@ -465,7 +487,7 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveSectionEditor(tab.id)}
+                onClick={() => handleSelectEditor(tab.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${
                   activeSectionEditor === tab.id
                     ? 'bg-emerald-800 text-white shadow-2xs'
