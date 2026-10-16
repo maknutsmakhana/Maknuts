@@ -53,6 +53,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     if (activeSubTab === 'alerts') {
       const el = document.getElementById('dashboard-alerts-card');
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (activeSubTab === 'overview') {
+      const el = document.getElementById('dashboard-overview-top');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [activeSubTab]);
 
@@ -122,7 +125,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     .slice(0, 6);
 
   return (
-    <div className="space-y-6">
+    <div id="dashboard-overview-top" className="space-y-6">
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-stone-950 rounded-3xl p-5 sm:p-6 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">

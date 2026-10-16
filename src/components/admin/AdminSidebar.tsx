@@ -320,8 +320,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   {section.subItems.map((sub) => {
                     const isSubActive = 
                       activeSubTab === sub.id || 
-                      (sub.id === 'homepage' && activeSubTab === 'hero') ||
-                      (sub.id === 'orders' && activeSubTab === 'all') ||
+                      (sub.id === 'homepage' && (activeSubTab === 'hero' || activeSubTab === 'homepage')) ||
+                      (sub.id === 'orders' && (activeSubTab === 'all' || activeSubTab === 'orders')) ||
+                      (sub.id === 'payments' && (activeSubTab === 'upi_verification' || activeSubTab === 'payments')) ||
                       (!activeSubTab && sub.id === section.subItems[0]?.id);
 
                     return (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
 import { Check, Plus, Minus, ShoppingBag, MessageCircle, ShieldCheck, Sparkles, AlertCircle, Maximize2, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
@@ -12,6 +13,7 @@ interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) => {
   const { storeSettings } = useStore();
+  const shouldReduceMotion = useReducedMotion();
   const minQty = Math.max(1, storeSettings?.minOrderQuantity || 1);
   const maxQty = Math.max(minQty, storeSettings?.maxOrderQuantity || 20);
   const [quantity, setQuantity] = useState(minQty);
@@ -65,7 +67,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-[#E9DFD1] shadow-xl shadow-stone-200/50 overflow-hidden">
+    <motion.div 
+      initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{ duration: 0.65, ease: 'easeOut' }}
+      className="bg-white rounded-3xl border border-[#E9DFD1] shadow-xl shadow-stone-200/50 overflow-hidden"
+    >
       <div className="grid grid-cols-1 md:grid-cols-12 gap-0">
         {/* Left Side: Product Image Display & Thumbnails */}
         <div className="md:col-span-6 bg-gradient-to-b from-[#F7F4EE] to-[#EFE9DF] p-4 sm:p-6 md:p-8 flex flex-col justify-between items-center relative border-b md:border-b-0 md:border-r border-[#E9DFD1]">
@@ -425,6 +433,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };

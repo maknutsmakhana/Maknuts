@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { StoreProvider, useStore } from './context/StoreContext';
 import { Header } from './components/Header';
 import { Banner } from './components/Banner';
@@ -219,7 +220,13 @@ function StoreFront() {
                 return (
                   <section key="productShowcase" aria-label="Main Product Showcase" className="space-y-4">
                     {(storeSettings.productSectionTitle || storeSettings.productSectionSubtitle) && (
-                      <div className="text-center max-w-xl mx-auto pt-2">
+                      <motion.div 
+                        initial={{ opacity: 0, y: 16 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.2 }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                        className="text-center max-w-xl mx-auto pt-2"
+                      >
                         {storeSettings.productSectionTitle && (
                           <h2 className="text-xl sm:text-2xl font-extrabold text-emerald-950 font-serif">
                             {storeSettings.productSectionTitle}
@@ -230,11 +237,17 @@ function StoreFront() {
                             {storeSettings.productSectionSubtitle}
                           </p>
                         )}
-                      </div>
+                      </motion.div>
                     )}
 
                     {products.length > 1 && (
-                      <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5">
+                      <motion.div 
+                        initial={{ opacity: 0, y: 12 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.2 }}
+                        transition={{ duration: 0.45, delay: 0.1, ease: 'easeOut' }}
+                        className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar pb-1 px-0.5"
+                      >
                         {products.map(p => (
                           <button
                             key={p.id}
@@ -248,7 +261,7 @@ function StoreFront() {
                             {p.name} ({p.weight})
                           </button>
                         ))}
-                      </div>
+                      </motion.div>
                     )}
 
                     <ProductCard

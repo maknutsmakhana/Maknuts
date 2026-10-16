@@ -609,6 +609,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   coupons={storeSettings.coupons || []}
                   reviews={reviews}
                   storeSettings={storeSettings}
+                  initialSubTab={activeSubTab}
+                  onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
               )}
 

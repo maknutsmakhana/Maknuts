@@ -31,6 +31,8 @@ interface AdminReportsTabProps {
   coupons: Coupon[];
   reviews: ReviewItem[];
   storeSettings?: StoreSettings;
+  initialSubTab?: string;
+  onSubTabChange?: (tab: string) => void;
 }
 
 export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
@@ -39,7 +41,24 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
   coupons,
   reviews,
   storeSettings,
+  initialSubTab = 'analytics',
+  onSubTabChange,
 }) => {
+  const [activeReportSubTab, setActiveReportSubTab] = useState<'analytics' | 'downloads'>(
+    initialSubTab === 'downloads' ? 'downloads' : 'analytics'
+  );
+
+  React.useEffect(() => {
+    if (initialSubTab) {
+      setActiveReportSubTab(initialSubTab === 'downloads' ? 'downloads' : 'analytics');
+    }
+  }, [initialSubTab]);
+
+  const handleSubTabSwitch = (tab: 'analytics' | 'downloads') => {
+    setActiveReportSubTab(tab);
+    onSubTabChange?.(tab);
+  };
+
   const [timeRange, setTimeRange] = useState<'all' | '30d' | '7d' | 'today'>('all');
 
   // Filter orders by time range
@@ -206,88 +225,194 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
               </button>
             ))}
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (storeSettings) {
-                downloadStoreExecutiveReportPdf(orders, products, storeSettings, coupons);
-              }
-            }}
-            className="px-3.5 py-2 bg-emerald-900 hover:bg-emerald-950 text-amber-300 border border-emerald-700/60 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
-            title="Download Comprehensive Executive Store Audit Report PDF"
-          >
-            <Download className="w-3.5 h-3.5 text-amber-300" />
-            <span>Executive Audit PDF</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (storeSettings) {
-                downloadOrdersReportPdf(filteredOrders, storeSettings, `Orders Report (${timeRange.toUpperCase()})`);
-              }
-            }}
-            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Download Detailed Orders Report PDF"
-          >
-            <FileText className="w-3.5 h-3.5 text-emerald-800" />
-            <span>Orders PDF</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (storeSettings) {
-                downloadProductsCatalogPdf(products, storeSettings);
-              }
-            }}
-            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Download Product Catalog Sheet PDF"
-          >
-            <Package className="w-3.5 h-3.5 text-emerald-800" />
-            <span>Catalog PDF</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (storeSettings) {
-                downloadCustomersReportPdf(orders, storeSettings);
-              }
-            }}
-            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Download Customer CRM Directory PDF"
-          >
-            <Users className="w-3.5 h-3.5 text-emerald-800" />
-            <span>Customers PDF</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (storeSettings) {
-                downloadCouponsReportPdf(coupons, storeSettings);
-              }
-            }}
-            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Download Coupons & Discounts PDF"
-          >
-            <Ticket className="w-3.5 h-3.5 text-emerald-800" />
-            <span>Coupons PDF</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportOrdersCsv}
-            className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Export CSV spreadsheet format"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Orders CSV</span>
-          </button>
         </div>
       </div>
+
+      {/* Subtab Navigation (Sales & Trends vs PDF Dossiers) */}
+      <div className="flex items-center gap-2 border-b border-stone-200 pb-2">
+        <button
+          type="button"
+          onClick={() => handleSubTabSwitch('analytics')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            activeReportSubTab === 'analytics'
+              ? 'bg-emerald-900 text-amber-200 shadow-sm border border-emerald-800'
+              : 'bg-white text-stone-600 hover:text-stone-900 border border-stone-200'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Sales & Trends (Analytics)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleSubTabSwitch('downloads')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+            activeReportSubTab === 'downloads'
+              ? 'bg-emerald-900 text-amber-200 shadow-sm border border-emerald-800'
+              : 'bg-white text-stone-600 hover:text-stone-900 border border-stone-200'
+          }`}
+        >
+          <Download className="w-4 h-4" />
+          <span>PDF Dossiers & Exports</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-400/20 text-amber-800 font-extrabold border border-amber-300">
+            6 Dossiers
+          </span>
+        </button>
+      </div>
+
+      {/* PDF DOSSIERS VIEW */}
+      {activeReportSubTab === 'downloads' && (
+        <div className="bg-white p-5 rounded-3xl border border-stone-200/90 shadow-2xs space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-stone-900 font-serif">Official PDF Dossiers & Data Exports</h3>
+            <p className="text-xs text-stone-500">
+              Download professionally formatted, high-resolution PDF dossiers for executive reviews, tax filings, audits, and CRM records.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
+            {/* 1. Executive Store Audit */}
+            <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/80 transition-colors flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-emerald-950 font-bold text-xs">
+                  <Download className="w-4 h-4 text-emerald-800" />
+                  <span>Executive Store Audit PDF</span>
+                </div>
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  Full store performance summary including revenue KPIs, order volume, coupon impact, and inventory health.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (storeSettings) downloadStoreExecutiveReportPdf(orders, products, storeSettings, coupons);
+                }}
+                className="mt-3 w-full py-2 px-3 rounded-xl bg-emerald-900 hover:bg-emerald-950 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-98 transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Executive Dossier</span>
+              </button>
+            </div>
+
+            {/* 2. Detailed Orders Report */}
+            <div className="p-4 rounded-2xl border border-stone-200 bg-stone-50 hover:bg-stone-100/80 transition-colors flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-stone-900 font-bold text-xs">
+                  <FileText className="w-4 h-4 text-emerald-800" />
+                  <span>Orders & Payments Ledger PDF</span>
+                </div>
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  Complete line-by-line breakdown of every order ({orders.length} total orders) with UTRs, customer contacts, addresses, and delivery fees.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (storeSettings) downloadOrdersReportPdf(filteredOrders, storeSettings, `Orders Report (${timeRange.toUpperCase()})`);
+                }}
+                className="mt-3 w-full py-2 px-3 rounded-xl bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-98 transition-all"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Download Orders PDF</span>
+              </button>
+            </div>
+
+            {/* 3. Product Catalog Sheet */}
+            <div className="p-4 rounded-2xl border border-stone-200 bg-stone-50 hover:bg-stone-100/80 transition-colors flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-stone-900 font-bold text-xs">
+                  <Package className="w-4 h-4 text-emerald-800" />
+                  <span>Product Catalog Sheet PDF</span>
+                </div>
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  SKUs, pack sizes, stock availability, pricing, discounts, and nutritional specifications for distribution.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (storeSettings) downloadProductsCatalogPdf(products, storeSettings);
+                }}
+                className="mt-3 w-full py-2 px-3 rounded-xl bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-98 transition-all"
+              >
+                <Package className="w-3.5 h-3.5" />
+                <span>Download Catalog PDF</span>
+              </button>
+            </div>
+
+            {/* 4. Customer CRM Directory */}
+            <div className="p-4 rounded-2xl border border-stone-200 bg-stone-50 hover:bg-stone-100/80 transition-colors flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-stone-900 font-bold text-xs">
+                  <Users className="w-4 h-4 text-emerald-800" />
+                  <span>Customer CRM Directory PDF</span>
+                </div>
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  Verified customer directory with lifetime order counts, total spending, phone contacts, and delivery locations.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (storeSettings) downloadCustomersReportPdf(orders, storeSettings);
+                }}
+                className="mt-3 w-full py-2 px-3 rounded-xl bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-98 transition-all"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Download Customers PDF</span>
+              </button>
+            </div>
+
+            {/* 5. Coupons & Promo Report */}
+            <div className="p-4 rounded-2xl border border-stone-200 bg-stone-50 hover:bg-stone-100/80 transition-colors flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-stone-900 font-bold text-xs">
+                  <Ticket className="w-4 h-4 text-emerald-800" />
+                  <span>Coupons & Promotions Audit PDF</span>
+                </div>
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  Active voucher rules, redemptions count, discount thresholds, validity dates, and revenue savings audit.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (storeSettings) downloadCouponsReportPdf(coupons, storeSettings);
+                }}
+                className="mt-3 w-full py-2 px-3 rounded-xl bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-98 transition-all"
+              >
+                <Ticket className="w-3.5 h-3.5" />
+                <span>Download Coupons PDF</span>
+              </button>
+            </div>
+
+            {/* 6. Raw Orders CSV */}
+            <div className="p-4 rounded-2xl border border-stone-200 bg-stone-50 hover:bg-stone-100/80 transition-colors flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-stone-900 font-bold text-xs">
+                  <Download className="w-4 h-4 text-stone-700" />
+                  <span>Full Orders Dataset (CSV)</span>
+                </div>
+                <p className="text-[11px] text-stone-600 leading-relaxed">
+                  Raw CSV spreadsheet format compatible with Excel, Google Sheets, Tally, or accounting software.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportOrdersCsv}
+                className="mt-3 w-full py-2 px-3 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-98 transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV Spreadsheet</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ANALYTICS & TRENDS VIEW */}
+      {activeReportSubTab === 'analytics' && (
+        <div className="space-y-6">
 
       {/* Primary Financial Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
@@ -442,6 +567,8 @@ export const AdminReportsTab: React.FC<AdminReportsTabProps> = ({
           )}
         </div>
       </div>
+      </div>
+      )}
     </div>
   );
 };
