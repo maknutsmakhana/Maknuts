@@ -40,6 +40,11 @@ export type AdminTab =
   | 'coupons'
   | 'orders'
   | 'payments'
+  | 'order_controls'
+  | 'upi_verification'
+  | 'cod'
+  | 'shipping_tracking'
+  | 'invoices'
   | 'customers'
   | 'reviews'
   | 'food_compliance'
@@ -97,7 +102,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       case 'pricing':
       case 'coupons': return 'pricing_promotions';
       case 'orders':
-      case 'payments': return 'orders_payments';
+      case 'payments':
+      case 'order_controls':
+      case 'upi_verification':
+      case 'cod':
+      case 'shipping_tracking':
+      case 'invoices': return 'orders_payments';
       case 'customers':
       case 'reviews': return 'customers_reviews';
       case 'whatsapp':

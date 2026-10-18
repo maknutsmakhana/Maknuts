@@ -128,6 +128,8 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
         showCustomerPincode: true,
         showOrderDetails: true,
         showPaymentMethod: true,
+        checkoutShowProductCard: true,
+        checkoutShowQuantityStepper: true,
         checkoutShowAddress: true,
         checkoutRequireAddress: true,
         checkoutShowPincode: true,
@@ -137,6 +139,15 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
         checkoutAllowUpi: true,
         checkoutAllowCod: true,
         checkoutShowUpiQr: true,
+        checkoutShowCouponInput: true,
+        checkoutShowPriceBreakdown: true,
+        checkoutShowBaseAmount: true,
+        checkoutShowStoreDiscount: true,
+        checkoutShowCouponDiscount: true,
+        checkoutShowSubtotal: true,
+        checkoutShowDeliveryCharge: true,
+        checkoutShowDeliveryIncentive: true,
+        checkoutShowTotalSavings: true,
       });
     } else if (preset === 'minimal') {
       setControls(prev => ({
@@ -160,12 +171,16 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
         showPaymentMethod: true,
         showUpiTransactionId: false,
         showPaymentVerificationNote: false,
+        checkoutShowProductCard: true,
+        checkoutShowQuantityStepper: true,
         checkoutShowLandmark: false,
         checkoutShowAlternatePhone: false,
         checkoutShowPincode: false,
         checkoutRequirePincode: false,
         checkoutShowCustomerNote: false,
         checkoutShowUpiQr: false,
+        checkoutShowCouponInput: false,
+        checkoutShowPriceBreakdown: false,
       }));
     } else if (preset === 'cod') {
       setControls(prev => ({
@@ -179,6 +194,8 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
         showPaymentVerificationNote: false,
         checkoutShowAddress: true,
         checkoutRequireAddress: true,
+        checkoutShowCouponInput: true,
+        checkoutShowPriceBreakdown: true,
       }));
     }
   };
@@ -283,6 +300,36 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
             </div>
 
             <div className="space-y-3">
+              {/* Product Info Card & Quantity Controls */}
+              <div className="p-3 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-stone-900 block">Product Details Card</span>
+                    <span className="text-[11px] text-stone-500">Show product photo, pack size, unit price & base total</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={controls.checkoutShowProductCard !== false}
+                    onChange={() => handleToggle('checkoutShowProductCard')}
+                    className="w-4 h-4 accent-emerald-800 rounded cursor-pointer"
+                  />
+                </div>
+                {controls.checkoutShowProductCard !== false && (
+                  <div className="pt-2 border-t border-stone-200/60 flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-stone-700">Quantity Stepper (+ / - stepper buttons)</span>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={controls.checkoutShowQuantityStepper !== false}
+                        onChange={() => handleToggle('checkoutShowQuantityStepper')}
+                        className="w-3.5 h-3.5 accent-emerald-800 rounded cursor-pointer"
+                      />
+                      <span>Enabled</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
               {/* Full Name Field */}
               <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 hover:bg-stone-100/80 border border-stone-200 transition-colors">
                 <div>
@@ -484,27 +531,125 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                 )}
               </div>
 
-              {/* Coupons & Price Breakdown */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-200">
-                  <span className="font-semibold text-stone-800">Coupon / Promo Box</span>
+              {/* Coupon / Promo Code Box in Place Order Screen */}
+              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Coupon / Promo Code Box in Place Order Screen</span>
+                    </span>
+                    <span className="text-[11px] text-stone-500 block">
+                      Allow customers to enter promo discount codes (e.g. WELCOME10, MAKNUTS50) and click available coupons
+                    </span>
+                  </div>
                   <input
                     type="checkbox"
                     checked={controls.checkoutShowCouponInput !== false}
                     onChange={() => handleToggle('checkoutShowCouponInput')}
-                    className="w-4 h-4 accent-emerald-800 rounded cursor-pointer"
+                    className="w-4 h-4 accent-emerald-800 rounded cursor-pointer shrink-0 ml-2"
                   />
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 border border-stone-200">
-                  <span className="font-semibold text-stone-800">Price Breakdown Box</span>
+              {/* Price Breakdown Box & Granular Row Toggles */}
+              <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-emerald-800" />
+                      <span>Price Breakdown & Summary in Place Order Screen</span>
+                    </span>
+                    <span className="text-[11px] text-stone-500 block">
+                      Shows itemized summary before order placement (product price, discounts, delivery charge, total)
+                    </span>
+                  </div>
                   <input
                     type="checkbox"
                     checked={controls.checkoutShowPriceBreakdown !== false}
                     onChange={() => handleToggle('checkoutShowPriceBreakdown')}
-                    className="w-4 h-4 accent-emerald-800 rounded cursor-pointer"
+                    className="w-4 h-4 accent-emerald-800 rounded cursor-pointer shrink-0 ml-2"
                   />
                 </div>
+
+                {/* Sub-toggles when Price Breakdown is enabled */}
+                {controls.checkoutShowPriceBreakdown !== false && (
+                  <div className="pt-2 border-t border-stone-200/80 space-y-2 bg-white/70 p-2.5 rounded-lg border border-stone-200/60">
+                    <span className="text-[11px] font-bold text-stone-700 block">Breakdown Line Item Toggles:</span>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                      <label className="flex items-center justify-between p-2 rounded bg-white border border-stone-200 cursor-pointer hover:bg-stone-50">
+                        <span className="text-stone-700">Product Base Price</span>
+                        <input
+                          type="checkbox"
+                          checked={controls.checkoutShowBaseAmount !== false}
+                          onChange={() => handleToggle('checkoutShowBaseAmount')}
+                          className="w-3.5 h-3.5 accent-emerald-800 rounded"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-2 rounded bg-white border border-stone-200 cursor-pointer hover:bg-stone-50">
+                        <span className="text-stone-700">Store Discount Row</span>
+                        <input
+                          type="checkbox"
+                          checked={controls.checkoutShowStoreDiscount !== false}
+                          onChange={() => handleToggle('checkoutShowStoreDiscount')}
+                          className="w-3.5 h-3.5 accent-emerald-800 rounded"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-2 rounded bg-white border border-stone-200 cursor-pointer hover:bg-stone-50">
+                        <span className="text-stone-700">Coupon Discount Row</span>
+                        <input
+                          type="checkbox"
+                          checked={controls.checkoutShowCouponDiscount !== false}
+                          onChange={() => handleToggle('checkoutShowCouponDiscount')}
+                          className="w-3.5 h-3.5 accent-emerald-800 rounded"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-2 rounded bg-white border border-stone-200 cursor-pointer hover:bg-stone-50">
+                        <span className="text-stone-700">Subtotal Row</span>
+                        <input
+                          type="checkbox"
+                          checked={controls.checkoutShowSubtotal !== false}
+                          onChange={() => handleToggle('checkoutShowSubtotal')}
+                          className="w-3.5 h-3.5 accent-emerald-800 rounded"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-2 rounded bg-white border border-stone-200 cursor-pointer hover:bg-stone-50">
+                        <span className="text-stone-700">Delivery Fee Row</span>
+                        <input
+                          type="checkbox"
+                          checked={controls.checkoutShowDeliveryCharge !== false}
+                          onChange={() => handleToggle('checkoutShowDeliveryCharge')}
+                          className="w-3.5 h-3.5 accent-emerald-800 rounded"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-2 rounded bg-white border border-stone-200 cursor-pointer hover:bg-stone-50">
+                        <span className="text-stone-700">Free Delivery Incentive</span>
+                        <input
+                          type="checkbox"
+                          checked={controls.checkoutShowDeliveryIncentive !== false}
+                          onChange={() => handleToggle('checkoutShowDeliveryIncentive')}
+                          className="w-3.5 h-3.5 accent-emerald-800 rounded"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-2 rounded bg-white border border-stone-200 cursor-pointer hover:bg-stone-50 sm:col-span-2">
+                        <span className="text-stone-700">Total Savings Celebratory Badge</span>
+                        <input
+                          type="checkbox"
+                          checked={controls.checkoutShowTotalSavings !== false}
+                          onChange={() => handleToggle('checkoutShowTotalSavings')}
+                          className="w-3.5 h-3.5 accent-emerald-800 rounded"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Custom Submit Button Text */}
@@ -891,6 +1036,29 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                 </div>
 
                 <div className="bg-[#FAF8F5] p-3.5 rounded-2xl border border-[#E2D5C3] shadow-xs space-y-3 text-xs max-h-[520px] overflow-y-auto">
+                  {/* Product Card Mockup */}
+                  {controls.checkoutShowProductCard !== false && (
+                    <div className="bg-white p-3 rounded-xl border border-stone-200 flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-emerald-800 text-xs shrink-0">
+                          MK
+                        </div>
+                        <div>
+                          <div className="font-bold text-stone-900 text-xs">Maknuts Makhana</div>
+                          <div className="text-[10px] text-stone-500">Pack: 250g · ₹299</div>
+                        </div>
+                      </div>
+
+                      {controls.checkoutShowQuantityStepper !== false && (
+                        <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-lg border border-stone-200 text-xs font-bold">
+                          <span className="w-5 h-5 flex items-center justify-center bg-white rounded shadow-2xs text-stone-700">−</span>
+                          <span className="w-4 text-center">2</span>
+                          <span className="w-5 h-5 flex items-center justify-center bg-white rounded shadow-2xs text-stone-700">+</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Estimated Delivery */}
                   {controls.checkoutShowEstimatedDelivery !== false && (
                     <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200 text-[11px] text-emerald-900 font-medium flex items-center gap-1.5">
@@ -974,7 +1142,10 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                   {/* Coupon Mockup */}
                   {controls.checkoutShowCouponInput !== false && (
                     <div className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-stone-700">Promo Code Box</span>
+                      <span className="text-[11px] font-bold text-stone-700 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-600" />
+                        <span>Promo Code Box</span>
+                      </span>
                       <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
                         MAKNUTS50
                       </span>
@@ -983,19 +1154,62 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
 
                   {/* Price Breakdown Mockup */}
                   {controls.checkoutShowPriceBreakdown !== false && (
-                    <div className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-1 text-[11px]">
-                      <div className="flex justify-between">
-                        <span>Product Total:</span>
-                        <span className="font-bold">₹598</span>
+                    <div className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-200/80 space-y-1.5 text-[11px]">
+                      <div className="font-bold text-[10px] text-stone-500 uppercase tracking-wider pb-0.5 border-b border-amber-200/50">
+                        2. Price Breakdown
                       </div>
-                      <div className="flex justify-between text-emerald-800 font-semibold">
-                        <span>Discount / Coupon:</span>
-                        <span>−₹110</span>
-                      </div>
+
+                      {controls.checkoutShowBaseAmount !== false && (
+                        <div className="flex justify-between">
+                          <span>Product Base Price (2 × ₹299):</span>
+                          <span className="font-semibold">₹598</span>
+                        </div>
+                      )}
+
+                      {controls.checkoutShowStoreDiscount !== false && (
+                        <div className="flex justify-between text-emerald-800 font-semibold">
+                          <span>Store Discount (10%):</span>
+                          <span>−₹60</span>
+                        </div>
+                      )}
+
+                      {controls.checkoutShowCouponDiscount !== false && (
+                        <div className="flex justify-between text-emerald-800 font-semibold">
+                          <span>Coupon Discount (MAKNUTS50):</span>
+                          <span>−₹50</span>
+                        </div>
+                      )}
+
+                      {controls.checkoutShowSubtotal !== false && (
+                        <div className="flex justify-between font-medium text-stone-600">
+                          <span>Subtotal:</span>
+                          <span>₹488</span>
+                        </div>
+                      )}
+
+                      {controls.checkoutShowDeliveryCharge !== false && (
+                        <div className="flex justify-between text-stone-600">
+                          <span>Delivery:</span>
+                          <span className="text-emerald-700 font-bold">FREE (₹0)</span>
+                        </div>
+                      )}
+
+                      {controls.checkoutShowDeliveryIncentive !== false && (
+                        <div className="text-[10px] text-amber-800 bg-amber-100/70 p-1.5 rounded-lg border border-amber-200">
+                          Add ₹12 more for Free Delivery!
+                        </div>
+                      )}
+
                       <div className="flex justify-between font-black text-xs pt-1 border-t border-amber-200 text-emerald-950">
                         <span>Final Total:</span>
                         <span>₹488</span>
                       </div>
+
+                      {controls.checkoutShowTotalSavings !== false && (
+                        <div className="text-[10px] text-emerald-800 font-bold bg-emerald-100 p-1 rounded-md text-center">
+                          You save ₹110 on this order!
+                        </div>
+                      )}
                     </div>
                   )}
 

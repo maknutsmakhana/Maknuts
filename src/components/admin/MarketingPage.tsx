@@ -21,6 +21,7 @@ import {
   Phone 
 } from 'lucide-react';
 import { createWhatsAppUrl, renderWhatsAppTemplate } from '../../utils/whatsapp';
+import { OrderDisplayControlsTab } from './OrderDisplayControlsTab';
 
 interface MarketingPageProps {
   settings: StoreSettings;
@@ -37,7 +38,7 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
   initialSubTab = 'whatsapp',
   onSubTabChange,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'whatsapp' | 'seo' | 'social' | 'structured_data'>(
+  const [activeSubTab, setActiveSubTab] = useState<'whatsapp' | 'order_controls' | 'seo' | 'social' | 'structured_data'>(
     (initialSubTab as any) || 'whatsapp'
   );
 
@@ -47,7 +48,7 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
     }
   }, [initialSubTab]);
 
-  const handleSubTabChange = (tab: 'whatsapp' | 'seo' | 'social' | 'structured_data') => {
+  const handleSubTabChange = (tab: 'whatsapp' | 'order_controls' | 'seo' | 'social' | 'structured_data') => {
     setActiveSubTab(tab);
     onSubTabChange?.(tab);
   };
@@ -195,6 +196,7 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
         <div className="flex items-center gap-2 border-b border-stone-100 pb-2 overflow-x-auto no-scrollbar">
           {[
             { id: 'whatsapp', label: 'WhatsApp Automation' },
+            { id: 'order_controls', label: 'Order Form & Sharing Toggles ⚙️' },
             { id: 'seo', label: 'SEO & Meta Tags' },
             { id: 'social', label: 'Social Media Links' },
             { id: 'structured_data', label: 'Schema.org JSON-LD' },
@@ -335,7 +337,34 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Quick link banner to granular toggles */}
+          <div className="p-4 bg-gradient-to-r from-emerald-900 to-stone-900 rounded-3xl text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-bold flex items-center gap-2">
+                <span>⚙️ Granular Order Form & Receipt Display Controls</span>
+              </h4>
+              <p className="text-xs text-emerald-200 mt-0.5">
+                Turn on/off customer name, phone, full address, landmark, PIN code, UPI QR, pricing breakdowns, and WhatsApp receipt lines with instant live preview.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSubTabChange('order_controls')}
+              className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs rounded-xl transition-all cursor-pointer whitespace-nowrap active:scale-95 shadow-xs"
+            >
+              Open Order Controls & Preview →
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* SUB-TAB: ORDER & CHECKOUT DISPLAY CONTROLS */}
+      {activeSubTab === 'order_controls' && (
+        <OrderDisplayControlsTab
+          settings={settings}
+          onSaveSettings={onSaveSettings}
+        />
       )}
 
       {/* SUB-TAB 2: SEO & META TAGS */}

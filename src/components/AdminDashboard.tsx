@@ -117,6 +117,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
       case 'orders_payments':
       case 'orders':
       case 'payments':
+      case 'order_controls':
+      case 'upi_verification':
+      case 'cod':
+      case 'shipping_tracking':
+      case 'invoices':
         setActivePrimaryTab('orders_payments');
         setActiveSubTab(subTab || (tab === 'orders_payments' ? 'orders' : tab));
         break;

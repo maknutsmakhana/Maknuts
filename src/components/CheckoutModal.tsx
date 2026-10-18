@@ -80,14 +80,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isOpen, initialQuantity, minQty, maxQty]);
 
+  const isUpiAllowed = ds.checkoutAllowUpi !== false && storeSettings.enableUpi !== false;
+  const isCodAllowed = ds.checkoutAllowCod !== false && storeSettings.enableCod !== false;
+
   // If UPI disabled by admin, fallback to COD, or vice versa
   useEffect(() => {
-    if (!storeSettings.enableUpi && storeSettings.enableCod) {
+    if (!isUpiAllowed && isCodAllowed) {
       setPaymentMethod('cod');
-    } else if (storeSettings.enableUpi && !storeSettings.enableCod) {
+    } else if (isUpiAllowed && !isCodAllowed) {
       setPaymentMethod('upi');
     }
-  }, [storeSettings.enableUpi, storeSettings.enableCod]);
+  }, [isUpiAllowed, isCodAllowed]);
 
   // Centralized calculations with coupon
   const pricing = calculateOrderPricing({
@@ -185,20 +188,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         .catch(err => console.error('Failed to generate UPI QR', err));
     }
   }, [storeSettings.upiId, upiUrl]);
-
-  if (!isOpen) return null;
-
-  const isUpiAllowed = ds.checkoutAllowUpi !== false && storeSettings.enableUpi !== false;
-  const isCodAllowed = ds.checkoutAllowCod !== false && storeSettings.enableCod !== false;
-
-  // If UPI disabled by admin, fallback to COD, or vice versa
-  useEffect(() => {
-    if (!isUpiAllowed && isCodAllowed) {
-      setPaymentMethod('cod');
-    } else if (isUpiAllowed && !isCodAllowed) {
-      setPaymentMethod('upi');
-    }
-  }, [isUpiAllowed, isCodAllowed]);
 
   const handleCopyUpi = () => {
     navigator.clipboard.writeText(storeSettings.upiId);
@@ -340,6 +329,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
       <div 
@@ -369,62 +360,66 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         <div ref={scrollContainerRef} className="p-5 overflow-y-auto space-y-6">
 
           {/* Section 1: Product & Quantity */}
-          <div className="bg-white p-4 rounded-2xl border border-[#E9DFD1] shadow-xs">
-            <div className="flex items-center gap-3.5">
-              <img
-                src={product.image}
-                alt={product.name}
-                referrerPolicy="no-referrer"
-                className="w-16 h-16 object-contain rounded-xl bg-[#FAF8F5] p-1 border border-stone-200 shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-sm text-stone-900 truncate font-serif">
-                  {product.name}
-                </h3>
-                <p className="text-xs text-stone-500">
-                  Pack: {product.weight} · <span className="font-bold text-stone-900">₹{unitPrice}</span>
-                  {product.originalPrice > unitPrice && (
-                    <span className="line-through text-stone-400 ml-1.5">₹{product.originalPrice}</span>
-                  )}
-                </p>
-                <div className="text-xs font-semibold text-emerald-800 mt-1">
-                  Base Amount: ₹{baseAmount}
+          {ds.checkoutShowProductCard !== false && (
+            <div className="bg-white p-4 rounded-2xl border border-[#E9DFD1] shadow-xs">
+              <div className="flex items-center gap-3.5">
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  referrerPolicy="no-referrer"
+                  className="w-16 h-16 object-contain rounded-xl bg-[#FAF8F5] p-1 border border-stone-200 shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm text-stone-900 truncate font-serif">
+                    {product.name}
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Pack: {product.weight} · <span className="font-bold text-stone-900">₹{unitPrice}</span>
+                    {product.originalPrice > unitPrice && (
+                      <span className="line-through text-stone-400 ml-1.5">₹{product.originalPrice}</span>
+                    )}
+                  </p>
+                  <div className="text-xs font-semibold text-emerald-800 mt-1">
+                    Base Amount: ₹{baseAmount}
+                  </div>
                 </div>
-              </div>
 
-              {/* Quantity Stepper (Bounded by admin rules) */}
-              <div className="flex flex-col items-end gap-1">
-                <div className="flex items-center gap-2 bg-stone-100 p-1.5 rounded-xl border border-stone-200">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(q => (q > minQty ? q - 1 : minQty))}
-                    className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-stone-700 hover:bg-stone-50 shadow-xs text-sm font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                    disabled={quantity <= minQty || isSubmitting}
-                    title={quantity <= minQty ? `Minimum order quantity is ${minQty}` : 'Decrease quantity'}
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="w-6 text-center font-bold text-sm text-stone-900">
-                    {quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(q => (q < maxQty ? q + 1 : maxQty))}
-                    disabled={quantity >= maxQty || isSubmitting}
-                    className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-stone-700 hover:bg-stone-50 shadow-xs text-sm font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                    title={quantity >= maxQty ? `Maximum order quantity is ${maxQty}` : 'Increase quantity'}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {(minQty > 1 || maxQty < 20) && (
-                  <span className="text-[10px] text-stone-400 font-medium">
-                    Limit: {minQty}–{maxQty}
-                  </span>
+                {/* Quantity Stepper (Bounded by admin rules) */}
+                {ds.checkoutShowQuantityStepper !== false && (
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="flex items-center gap-2 bg-stone-100 p-1.5 rounded-xl border border-stone-200">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(q => (q > minQty ? q - 1 : minQty))}
+                        className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-stone-700 hover:bg-stone-50 shadow-xs text-sm font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                        disabled={quantity <= minQty || isSubmitting}
+                        title={quantity <= minQty ? `Minimum order quantity is ${minQty}` : 'Decrease quantity'}
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="w-6 text-center font-bold text-sm text-stone-900">
+                        {quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(q => (q < maxQty ? q + 1 : maxQty))}
+                        disabled={quantity >= maxQty || isSubmitting}
+                        className="w-7 h-7 rounded-lg bg-white flex items-center justify-center text-stone-700 hover:bg-stone-50 shadow-xs text-sm font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                        title={quantity >= maxQty ? `Maximum order quantity is ${maxQty}` : 'Increase quantity'}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {(minQty > 1 || maxQty < 20) && (
+                      <span className="text-[10px] text-stone-400 font-medium">
+                        Limit: {minQty}–{maxQty}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Estimated Pan-India Delivery Banner */}
           {ds.checkoutShowEstimatedDelivery !== false && (
@@ -719,13 +714,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
 
               {/* Base Amount */}
-              <div className="flex justify-between text-xs text-stone-600">
-                <span>Product Price ({quantity} × ₹{unitPrice}):</span>
-                <span className="font-semibold text-stone-900">₹{baseAmount}</span>
-              </div>
+              {ds.checkoutShowBaseAmount !== false && (
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span>Product Price ({quantity} × ₹{unitPrice}):</span>
+                  <span className="font-semibold text-stone-900">₹{baseAmount}</span>
+                </div>
+              )}
 
               {/* Discount Row (If applied) */}
-              {discountAmount > 0 && (
+              {ds.checkoutShowStoreDiscount !== false && discountAmount > 0 && (
                 <div className="flex justify-between text-xs text-emerald-800 font-semibold bg-emerald-50/80 -mx-1 px-1.5 py-1 rounded-lg border border-emerald-200/60">
                   <span className="flex items-center gap-1">
                     <Tag className="w-3 h-3 text-emerald-700" />
@@ -736,7 +733,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
 
               {/* Coupon Discount Row (If applied) */}
-              {couponDiscount > 0 && (
+              {ds.checkoutShowCouponDiscount !== false && couponDiscount > 0 && (
                 <div className="flex justify-between text-xs text-emerald-800 font-semibold bg-emerald-50 -mx-1 px-1.5 py-1 rounded-lg border border-emerald-300">
                   <span className="flex items-center gap-1">
                     <Ticket className="w-3 h-3 text-emerald-700" />
@@ -747,28 +744,32 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
 
               {/* Subtotal */}
-              <div className="flex justify-between text-xs text-stone-600">
-                <span>Subtotal:</span>
-                <span className="font-semibold text-stone-900">₹{subtotal}</span>
-              </div>
+              {ds.checkoutShowSubtotal !== false && (
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span>Subtotal:</span>
+                  <span className="font-semibold text-stone-900">₹{subtotal}</span>
+                </div>
+              )}
 
               {/* Delivery Charge */}
-              <div className="flex justify-between text-xs text-stone-600">
-                <span className="flex items-center gap-1.5">
-                  <span>Delivery:</span>
-                  {isFreeDelivery && (
-                    <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-1.5 py-0.5 rounded-full">
-                      FREE Delivery
-                    </span>
-                  )}
-                </span>
-                <span className={`font-semibold ${isFreeDelivery ? 'text-emerald-700 font-bold' : 'text-stone-900'}`}>
-                  {isFreeDelivery ? 'FREE (₹0)' : `₹${deliveryCharge}`}
-                </span>
-              </div>
+              {ds.checkoutShowDeliveryCharge !== false && (
+                <div className="flex justify-between text-xs text-stone-600">
+                  <span className="flex items-center gap-1.5">
+                    <span>Delivery:</span>
+                    {isFreeDelivery && (
+                      <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                        FREE Delivery
+                      </span>
+                    )}
+                  </span>
+                  <span className={`font-semibold ${isFreeDelivery ? 'text-emerald-700 font-bold' : 'text-stone-900'}`}>
+                    {isFreeDelivery ? 'FREE (₹0)' : `₹${deliveryCharge}`}
+                  </span>
+                </div>
+              )}
 
               {/* Free Delivery incentive if not yet free */}
-              {!isFreeDelivery && storeSettings.freeDeliveryThreshold > 0 && subtotal < storeSettings.freeDeliveryThreshold && (
+              {ds.checkoutShowDeliveryIncentive !== false && !isFreeDelivery && storeSettings.freeDeliveryThreshold > 0 && subtotal < storeSettings.freeDeliveryThreshold && (
                 <div className="text-[11px] text-amber-800 bg-amber-50/80 border border-amber-200/80 rounded-xl px-2.5 py-1 flex items-center justify-between">
                   <span>Add ₹{Math.max(0, storeSettings.freeDeliveryThreshold - subtotal)} more for Free Delivery!</span>
                   <span className="text-[10px] text-amber-700 font-bold">(Eligible at ₹{storeSettings.freeDeliveryThreshold})</span>
@@ -791,7 +792,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
 
               {/* Total Savings banner */}
-              {totalSavings > 0 && (
+              {ds.checkoutShowTotalSavings !== false && totalSavings > 0 && (
                 <div className="mt-1 text-[11px] font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-300/80 rounded-xl py-1.5 px-3 flex items-center justify-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                   <span>You save ₹{totalSavings} on this order!</span>

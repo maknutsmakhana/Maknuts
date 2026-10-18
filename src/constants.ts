@@ -33,6 +33,8 @@ export const DEFAULT_ORDER_DISPLAY_SETTINGS: OrderDisplaySettings = {
   closingText: 'Please confirm my order and send dispatch details. Thank you!',
 
   // Customer Checkout Modal Controls (During ordering by customer)
+  checkoutShowProductCard: true,
+  checkoutShowQuantityStepper: true,
   checkoutShowCustomerName: true,
   checkoutShowPhone: true,
   checkoutShowAddress: true,
@@ -50,6 +52,13 @@ export const DEFAULT_ORDER_DISPLAY_SETTINGS: OrderDisplaySettings = {
   checkoutEstimatedDeliveryText: 'Dispatched within 24 hours · Delivery in 2-4 business days across India',
   checkoutShowCouponInput: true,
   checkoutShowPriceBreakdown: true,
+  checkoutShowBaseAmount: true,
+  checkoutShowStoreDiscount: true,
+  checkoutShowCouponDiscount: true,
+  checkoutShowSubtotal: true,
+  checkoutShowDeliveryCharge: true,
+  checkoutShowDeliveryIncentive: true,
+  checkoutShowTotalSavings: true,
   checkoutSubmitButtonText: 'PLACE ORDER ON WHATSAPP',
 };
 

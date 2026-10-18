@@ -204,6 +204,8 @@ export interface OrderDisplaySettings {
   closingText?: string;
 
   // Checkout Ordering Controls (During order submission by customer)
+  checkoutShowProductCard?: boolean;
+  checkoutShowQuantityStepper?: boolean;
   checkoutShowCustomerName?: boolean;
   checkoutShowPhone?: boolean;
   checkoutShowAddress?: boolean;
@@ -221,6 +223,13 @@ export interface OrderDisplaySettings {
   checkoutEstimatedDeliveryText?: string;
   checkoutShowCouponInput?: boolean;
   checkoutShowPriceBreakdown?: boolean;
+  checkoutShowBaseAmount?: boolean;
+  checkoutShowStoreDiscount?: boolean;
+  checkoutShowCouponDiscount?: boolean;
+  checkoutShowSubtotal?: boolean;
+  checkoutShowDeliveryCharge?: boolean;
+  checkoutShowDeliveryIncentive?: boolean;
+  checkoutShowTotalSavings?: boolean;
   checkoutSubmitButtonText?: string;
 }
 
