@@ -10,7 +10,7 @@ import {
   Info,
   Phone
 } from 'lucide-react';
-import { createWhatsAppUrl } from '../../utils/whatsapp';
+import { createWhatsAppUrl, renderWhatsAppTemplate } from '../../utils/whatsapp';
 
 interface AdminWhatsAppTabProps {
   settings: StoreSettings;
@@ -25,8 +25,8 @@ export const AdminWhatsAppTab: React.FC<AdminWhatsAppTabProps> = ({
   const [waSettings, setWaSettings] = useState<WhatsAppSettings>({
     ...(settings.whatsAppSettings || {
       enabled: true,
-      businessNumber: settings.whatsappNumber || '919876543210',
-      orderTemplate: 'Hello {{customerName}}! Thank you for choosing Maknuts Makhana. Your Order #{{orderId}} for (Total: ₹{{amount}}) is confirmed! Payment: {{paymentMethod}}. Track live at {{trackingUrl}}. Support: {{supportPhone}}.',
+      businessNumber: settings.whatsappNumber || '917801051792',
+      orderTemplate: '🌿 *NEW ORDER - MAKNUTS* 🌿\n\n📦 *Order ID:* {{orderId}}\n👤 *Customer Name:* {{customerName}}\n📱 *Mobile:* {{phone}}\n📍 *Delivery Address:* {{address}}, PIN: {{pincode}}\n🛒 *Product:* {{productName}} (Qty: {{quantity}})\n💰 *Total:* ₹{{total}}\n💳 *Payment Method:* {{paymentMethod}}\n{{utr}}\n\nPlease confirm my order and send dispatch details. Thank you!',
       paymentTemplate: 'Hi {{customerName}}, we have received your payment of ₹{{amount}} for Order #{{orderId}}. Your fresh harvest Makhana is scheduled for dispatch. Support: {{supportPhone}}.',
       supportTemplate: 'Hello Maknuts Support! I have a question regarding an order or product quality.',
     })
@@ -68,12 +68,19 @@ export const AdminWhatsAppTab: React.FC<AdminWhatsAppTabProps> = ({
   };
 
   const handleTestLink = (template: string) => {
-    const previewText = template
-      .replace('{customerName}', 'Ramesh Kumar')
-      .replace('{orderNumber}', 'MK-2610-A7F')
-      .replace('{items}', '1x Maknuts Makhana 250g')
-      .replace('{amount}', '299')
-      .replace('{paymentMethod}', 'UPI');
+    const previewText = renderWhatsAppTemplate(template, {
+      orderId: 'MK-2610-A7F',
+      customerName: 'Rahul Sharma',
+      phone: '9876543210',
+      address: 'Flat 302, Green Park Residency, Gandhi Chowk, Patna',
+      pincode: '800001',
+      productName: 'Maknuts Makhana 250g',
+      quantity: 2,
+      total: 488,
+      amount: 488,
+      paymentMethod: 'UPI',
+      utr: '429381928371'
+    });
 
     const url = createWhatsAppUrl(phone, previewText);
     setTestUrl(url);
@@ -190,7 +197,7 @@ export const AdminWhatsAppTab: React.FC<AdminWhatsAppTabProps> = ({
             Automated Message Templates
           </h3>
           <span className="text-[10px] text-stone-500 font-mono">
-            Placeholders: {'{{orderId}}'}, {'{{customerName}}'}, {'{{amount}}'}, {'{{paymentMethod}}'}, {'{{trackingUrl}}'}, {'{{supportPhone}}'}
+            Placeholders: {'{{orderId}}'}, {'{{customerName}}'}, {'{{phone}}'}, {'{{address}}'}, {'{{pincode}}'}, {'{{amount}}'}, {'{{paymentMethod}}'}, {'{{trackingUrl}}'}, {'{{supportPhone}}'}
           </span>
         </div>
 

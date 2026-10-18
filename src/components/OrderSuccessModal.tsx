@@ -21,7 +21,8 @@ export const OrderSuccessModal: React.FC<OrderSuccessModalProps> = ({
   if (!order) return null;
 
   const customTemplate = storeSettings.whatsAppSettings?.orderTemplate;
-  const orderMessage = generateOrderWhatsAppMessage(order, storeSettings.shopName, customTemplate);
+  const ds = storeSettings.orderDisplaySettings || storeSettings.whatsAppSettings?.orderDisplaySettings;
+  const orderMessage = generateOrderWhatsAppMessage(order, storeSettings.shopName, customTemplate, ds);
   const targetPhone = storeSettings.whatsAppSettings?.businessNumber || storeSettings.whatsappNumber;
   const whatsappUrl = createWhatsAppUrl(targetPhone, orderMessage);
 

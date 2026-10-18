@@ -174,6 +174,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         { id: 'cod', label: 'COD Tracking' },
         { id: 'shipping_tracking', label: 'Shipping & AWB' },
         { id: 'invoices', label: 'Invoices' },
+        { id: 'order_controls', label: 'Order Form & WhatsApp' },
       ]
     },
     {

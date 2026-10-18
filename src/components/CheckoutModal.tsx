@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Product, StoreSettings, Order, Coupon } from '../types';
 import { useStore } from '../context/StoreContext';
 import { 
-  X, Check, Copy, ShieldCheck, 
+  X, Check, Copy, ShieldCheck, Truck,
   CreditCard, Banknote, QrCode, AlertCircle, MessageCircle, ExternalLink, Plus, Minus, RefreshCw, Tag, Sparkles, Ticket
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { generateOrderWhatsAppMessage, createWhatsAppUrl } from '../utils/whatsapp';
 import { calculateOrderPricing, validateAndApplyCoupon } from '../utils/pricing';
+import { DEFAULT_ORDER_DISPLAY_SETTINGS } from '../constants';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -26,13 +27,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   const { storeSettings, createOrder, orders } = useStore();
 
+  const ds = {
+    ...DEFAULT_ORDER_DISPLAY_SETTINGS,
+    ...(storeSettings.orderDisplaySettings || {}),
+    ...(storeSettings.whatsAppSettings?.orderDisplaySettings || {})
+  };
+
   const minQty = Math.max(1, storeSettings?.minOrderQuantity || 1);
   const maxQty = Math.max(minQty, storeSettings?.maxOrderQuantity || 20);
 
   // Form states
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
+  const [alternatePhone, setAlternatePhone] = useState('');
   const [address, setAddress] = useState('');
+  const [landmark, setLandmark] = useState('');
   const [pincode, setPincode] = useState('');
   const [quantity, setQuantity] = useState(initialQuantity);
   const [note, setNote] = useState('');
@@ -179,6 +188,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isUpiAllowed = ds.checkoutAllowUpi !== false && storeSettings.enableUpi !== false;
+  const isCodAllowed = ds.checkoutAllowCod !== false && storeSettings.enableCod !== false;
+
+  // If UPI disabled by admin, fallback to COD, or vice versa
+  useEffect(() => {
+    if (!isUpiAllowed && isCodAllowed) {
+      setPaymentMethod('cod');
+    } else if (isUpiAllowed && !isCodAllowed) {
+      setPaymentMethod('upi');
+    }
+  }, [isUpiAllowed, isCodAllowed]);
+
   const handleCopyUpi = () => {
     navigator.clipboard.writeText(storeSettings.upiId);
     setCopiedUpi(true);
@@ -188,22 +209,30 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!customerName.trim()) {
+    // Customer Name validation
+    if (ds.checkoutShowCustomerName !== false && !customerName.trim()) {
       newErrors.customerName = 'Please enter your full name';
     }
 
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (!cleanPhone || cleanPhone.length < 10) {
-      newErrors.phone = 'Please enter a valid 10-digit mobile number';
+    // Phone validation
+    if (ds.checkoutShowPhone !== false) {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (!cleanPhone || cleanPhone.length < 10) {
+        newErrors.phone = 'Please enter a valid 10-digit mobile number';
+      }
     }
 
-    if (!address.trim()) {
+    // Address validation (only required if enabled and required by admin)
+    if (ds.checkoutShowAddress !== false && ds.checkoutRequireAddress !== false && !address.trim()) {
       newErrors.address = 'Please enter delivery address';
     }
 
-    const cleanPin = pincode.replace(/\D/g, '');
-    if (!cleanPin || cleanPin.length < 6) {
-      newErrors.pincode = 'Please enter 6-digit PIN code';
+    // Pincode validation (only required if enabled and required by admin)
+    if (ds.checkoutShowPincode !== false && ds.checkoutRequirePincode !== false) {
+      const cleanPin = pincode.replace(/\D/g, '');
+      if (!cleanPin || cleanPin.length < 6) {
+        newErrors.pincode = 'Please enter 6-digit PIN code';
+      }
     }
 
     // Optional UTR validation when UPI is selected
@@ -253,10 +282,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     try {
       // 1. Create order record in Firebase Firestore
+      const effectiveName = customerName.trim() || 'Valued Customer';
+      const effectivePhone = phone.trim() || storeSettings.whatsappNumber || '917801051792';
+      const effectiveAddress = address.trim() || 'Direct Store Pickup';
+
       const order = await createOrder({
-        customerName: customerName.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
+        customerName: effectiveName,
+        phone: effectivePhone,
+        alternatePhone: alternatePhone.trim() ? alternatePhone.trim() : undefined,
+        address: effectiveAddress,
+        landmark: landmark.trim() ? landmark.trim() : undefined,
         pincode: pincode.trim(),
         productId: product.id,
         productName: product.name,
@@ -276,7 +311,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       // 2. Format WhatsApp message using Admin configured template and URL
       const customTemplate = storeSettings.whatsAppSettings?.orderTemplate;
-      const message = generateOrderWhatsAppMessage(order, storeSettings.shopName, customTemplate);
+      const message = generateOrderWhatsAppMessage(order, storeSettings.shopName, customTemplate, ds);
       const targetPhone = storeSettings.whatsAppSettings?.businessNumber || storeSettings.whatsappNumber;
       const whatsappUrl = createWhatsAppUrl(targetPhone, message);
 
@@ -391,318 +426,379 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           </div>
 
+          {/* Estimated Pan-India Delivery Banner */}
+          {ds.checkoutShowEstimatedDelivery !== false && (
+            <div className="flex items-center gap-2.5 p-3.5 bg-emerald-50/90 border border-emerald-200/90 rounded-2xl text-xs text-emerald-950 font-medium">
+              <Truck className="w-4 h-4 text-emerald-700 shrink-0" />
+              <span>{ds.checkoutEstimatedDeliveryText || 'Dispatched within 24 hours · Delivery in 2-4 business days across India'}</span>
+            </div>
+          )}
+
           {/* Section 2: Delivery Details Form */}
           <div className="space-y-3.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-emerald-950">
                 1. Delivery Information
               </label>
-              <span className="text-[11px] text-stone-400">All fields required</span>
+              <span className="text-[11px] text-stone-400">
+                {ds.checkoutRequireAddress !== false ? 'Required for dispatch' : 'Express Checkout'}
+              </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Full Name */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Rahul Sharma"
-                  value={customerName}
-                  disabled={isSubmitting}
-                  onChange={e => {
-                    setCustomerName(e.target.value);
-                    if (errors.customerName) setErrors({ ...errors, customerName: '' });
-                  }}
-                  className={`w-full px-3.5 py-2.5 rounded-xl bg-white border text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 ${
-                    errors.customerName ? 'border-rose-400 bg-rose-50/30' : 'border-stone-300'
-                  }`}
-                />
-                {errors.customerName && (
-                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> {errors.customerName}
-                  </p>
-                )}
-              </div>
+              {ds.checkoutShowCustomerName !== false && (
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Rahul Sharma"
+                    value={customerName}
+                    disabled={isSubmitting}
+                    onChange={e => {
+                      setCustomerName(e.target.value);
+                      if (errors.customerName) setErrors({ ...errors, customerName: '' });
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 ${
+                      errors.customerName ? 'border-rose-400 bg-rose-50/30' : 'border-stone-300'
+                    }`}
+                  />
+                  {errors.customerName && (
+                    <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {errors.customerName}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Mobile Number */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Mobile Number (WhatsApp) *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs text-stone-500 font-medium">
-                    +91
-                  </span>
+              {ds.checkoutShowPhone !== false && (
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Mobile Number (WhatsApp) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs text-stone-500 font-medium">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      placeholder="9876543210"
+                      value={phone}
+                      disabled={isSubmitting}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setPhone(val);
+                        if (errors.phone) setErrors({ ...errors, phone: '' });
+                      }}
+                      className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white border text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 ${
+                        errors.phone ? 'border-rose-400 bg-rose-50/30' : 'border-stone-300'
+                      }`}
+                    />
+                  </div>
+                  {errors.phone && (
+                    <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {errors.phone}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Optional Alternate Phone */}
+              {ds.checkoutShowAlternatePhone === true && (
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Alternate Mobile / Contact <span className="text-stone-400 font-normal">(Optional)</span>
+                  </label>
                   <input
                     type="tel"
                     maxLength={10}
-                    placeholder="9876543210"
-                    value={phone}
+                    placeholder="e.g. 9811223344"
+                    value={alternatePhone}
                     disabled={isSubmitting}
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      setPhone(val);
-                      if (errors.phone) setErrors({ ...errors, phone: '' });
-                    }}
-                    className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-white border text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 ${
-                      errors.phone ? 'border-rose-400 bg-rose-50/30' : 'border-stone-300'
-                    }`}
+                    onChange={e => setAlternatePhone(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
                   />
                 </div>
-                {errors.phone && (
-                  <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> {errors.phone}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Address */}
-            <div>
-              <label className="block text-xs font-semibold text-stone-700 mb-1">
-                Full Delivery Address (House/Flat No, Street, Landmark, City) *
-              </label>
-              <textarea
-                rows={2}
-                placeholder="e.g. Flat 302, Green Park Residency, Near Gandhi Chowk, Patna, Bihar"
-                value={address}
-                disabled={isSubmitting}
-                onChange={e => {
-                  setAddress(e.target.value);
-                  if (errors.address) setErrors({ ...errors, address: '' });
-                }}
-                className={`w-full px-3.5 py-2.5 rounded-xl bg-white border text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 ${
-                  errors.address ? 'border-rose-400 bg-rose-50/30' : 'border-stone-300'
-                }`}
-              />
-              {errors.address && (
-                <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> {errors.address}
-                </p>
               )}
             </div>
 
-            {/* PIN Code & Note */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Address */}
+            {ds.checkoutShowAddress !== false && (
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Postal PIN Code *
+                  Full Delivery Address (House/Flat No, Street, Area, City) {ds.checkoutRequireAddress !== false ? '*' : '(Optional)'}
                 </label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  placeholder="e.g. 846004"
-                  value={pincode}
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Flat 302, Green Park Residency, Near Gandhi Chowk, Patna, Bihar"
+                  value={address}
                   disabled={isSubmitting}
                   onChange={e => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    setPincode(val);
-                    if (errors.pincode) setErrors({ ...errors, pincode: '' });
+                    setAddress(e.target.value);
+                    if (errors.address) setErrors({ ...errors, address: '' });
                   }}
                   className={`w-full px-3.5 py-2.5 rounded-xl bg-white border text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 ${
-                    errors.pincode ? 'border-rose-400 bg-rose-50/30' : 'border-stone-300'
+                    errors.address ? 'border-rose-400 bg-rose-50/30' : 'border-stone-300'
                   }`}
                 />
-                {errors.pincode && (
+                {errors.address && (
                   <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" /> {errors.pincode}
+                    <AlertCircle className="w-3 h-3" /> {errors.address}
                   </p>
                 )}
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Optional Delivery Note
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Call before delivery"
-                  value={note}
-                  disabled={isSubmitting}
-                  onChange={e => setNote(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
-                />
-              </div>
+            {/* Landmark & PIN Code */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Landmark */}
+              {ds.checkoutShowLandmark !== false && (
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Landmark / Floor / Apt <span className="text-stone-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Opp. City Mall, 3rd Floor"
+                    value={landmark}
+                    disabled={isSubmitting}
+                    onChange={e => setLandmark(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                  />
+                </div>
+              )}
+
+              {/* PIN Code */}
+              {ds.checkoutShowPincode !== false && (
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Postal PIN Code {ds.checkoutRequirePincode !== false ? '*' : '(Optional)'}
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="e.g. 846004"
+                    value={pincode}
+                    disabled={isSubmitting}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setPincode(val);
+                      if (errors.pincode) setErrors({ ...errors, pincode: '' });
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 ${
+                      errors.pincode ? 'border-rose-400 bg-rose-50/30' : 'border-stone-300'
+                    }`}
+                  />
+                  {errors.pincode && (
+                    <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {errors.pincode}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Optional Delivery Note */}
+              {ds.checkoutShowCustomerNote !== false && (
+                <div className={ds.checkoutShowLandmark === false || ds.checkoutShowPincode === false ? 'sm:col-span-1' : 'sm:col-span-2'}>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Optional Delivery Note
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Please call before arriving or leave with security"
+                    value={note}
+                    disabled={isSubmitting}
+                    onChange={e => setNote(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-stone-300 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
           {/* Coupon Code Section */}
-          <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-                <Ticket className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Apply Coupon / Promo Code</span>
-              </label>
-              {appliedCoupon && (
-                <button
-                  type="button"
-                  onClick={handleRemoveCoupon}
-                  className="text-[11px] text-rose-700 hover:text-rose-900 font-bold underline cursor-pointer"
-                >
-                  Remove Coupon
-                </button>
+          {ds.checkoutShowCouponInput !== false && (
+            <div className="bg-white p-3.5 rounded-2xl border border-stone-200 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                  <Ticket className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Apply Coupon / Promo Code</span>
+                </label>
+                {appliedCoupon && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-[11px] text-rose-700 hover:text-rose-900 font-bold underline cursor-pointer"
+                  >
+                    Remove Coupon
+                  </button>
+                )}
+              </div>
+
+              {appliedCoupon ? (
+                <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-extrabold px-2 py-0.5 rounded bg-emerald-800 text-white text-[11px]">
+                      {appliedCoupon.code}
+                    </span>
+                    <span className="text-emerald-900 font-semibold">
+                      {appliedCoupon.discountType === 'free_delivery'
+                        ? 'Free Delivery Activated'
+                        : `₹${couponDiscount} Discount Applied`}
+                    </span>
+                  </div>
+                  <Check className="w-4 h-4 text-emerald-700" />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. WELCOME10, MAKNUTS50"
+                    value={couponCodeInput}
+                    disabled={isSubmitting}
+                    onChange={e => {
+                      setCouponCodeInput(e.target.value.toUpperCase());
+                      if (couponFeedback) setCouponFeedback(null);
+                    }}
+                    className="flex-1 px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs uppercase font-mono font-bold text-stone-900 placeholder:normal-case placeholder:font-normal focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleApplyCoupon()}
+                    disabled={!couponCodeInput.trim() || isSubmitting}
+                    className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+
+              {/* Quick Coupon Suggestions */}
+              {!appliedCoupon && storeSettings.coupons && storeSettings.coupons.filter(c => c.enabled).length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[10px] text-stone-500 font-medium">Offers:</span>
+                  {storeSettings.coupons.filter(c => c.enabled).slice(0, 3).map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleApplyCoupon(c.code)}
+                      className="px-2 py-0.5 bg-stone-100 hover:bg-emerald-50 hover:text-emerald-900 hover:border-emerald-300 border border-stone-200 rounded-lg text-[10px] font-mono font-bold text-stone-700 cursor-pointer transition-colors"
+                    >
+                      {c.code}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Feedback message */}
+              {couponFeedback && (
+                <p className={`text-[11px] font-semibold flex items-center gap-1 pt-0.5 ${
+                  couponFeedback.type === 'success' ? 'text-emerald-700' : 'text-rose-600'
+                }`}>
+                  {couponFeedback.type === 'success' ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                  <span>{couponFeedback.message}</span>
+                </p>
               )}
             </div>
-
-            {appliedCoupon ? (
-              <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-extrabold px-2 py-0.5 rounded bg-emerald-800 text-white text-[11px]">
-                    {appliedCoupon.code}
-                  </span>
-                  <span className="text-emerald-900 font-semibold">
-                    {appliedCoupon.discountType === 'free_delivery'
-                      ? 'Free Delivery Activated'
-                      : `₹${couponDiscount} Discount Applied`}
-                  </span>
-                </div>
-                <Check className="w-4 h-4 text-emerald-700" />
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="e.g. WELCOME10, MAKNUTS50"
-                  value={couponCodeInput}
-                  disabled={isSubmitting}
-                  onChange={e => {
-                    setCouponCodeInput(e.target.value.toUpperCase());
-                    if (couponFeedback) setCouponFeedback(null);
-                  }}
-                  className="flex-1 px-3 py-2 bg-stone-50 border border-stone-300 rounded-xl text-xs uppercase font-mono font-bold text-stone-900 placeholder:normal-case placeholder:font-normal focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleApplyCoupon()}
-                  disabled={!couponCodeInput.trim() || isSubmitting}
-                  className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
-                >
-                  Apply
-                </button>
-              </div>
-            )}
-
-            {/* Quick Coupon Suggestions */}
-            {!appliedCoupon && storeSettings.coupons && storeSettings.coupons.filter(c => c.enabled).length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                <span className="text-[10px] text-stone-500 font-medium">Offers:</span>
-                {storeSettings.coupons.filter(c => c.enabled).slice(0, 3).map(c => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => handleApplyCoupon(c.code)}
-                    className="px-2 py-0.5 bg-stone-100 hover:bg-emerald-50 hover:text-emerald-900 hover:border-emerald-300 border border-stone-200 rounded-lg text-[10px] font-mono font-bold text-stone-700 cursor-pointer transition-colors"
-                  >
-                    {c.code}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Feedback message */}
-            {couponFeedback && (
-              <p className={`text-[11px] font-semibold flex items-center gap-1 pt-0.5 ${
-                couponFeedback.type === 'success' ? 'text-emerald-700' : 'text-rose-600'
-              }`}>
-                {couponFeedback.type === 'success' ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                <span>{couponFeedback.message}</span>
-              </p>
-            )}
-          </div>
+          )}
 
           {/* Section 3: Order Summary with Full Pricing Breakdown */}
-          <div className="bg-[#FAF7F0] p-4 rounded-2xl border border-[#E6DCce] space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
-                2. Price Breakdown
-              </span>
-              <span className="text-[11px] text-stone-500 font-medium">
-                {quantity} {quantity === 1 ? 'item' : 'items'}
-              </span>
-            </div>
-
-            {/* Base Amount */}
-            <div className="flex justify-between text-xs text-stone-600">
-              <span>Product Price ({quantity} × ₹{unitPrice}):</span>
-              <span className="font-semibold text-stone-900">₹{baseAmount}</span>
-            </div>
-
-            {/* Discount Row (If applied) */}
-            {discountAmount > 0 && (
-              <div className="flex justify-between text-xs text-emerald-800 font-semibold bg-emerald-50/80 -mx-1 px-1.5 py-1 rounded-lg border border-emerald-200/60">
-                <span className="flex items-center gap-1">
-                  <Tag className="w-3 h-3 text-emerald-700" />
-                  <span>Store Discount {discountType === 'percentage' ? `(${discountValue}%)` : ''}:</span>
+          {ds.checkoutShowPriceBreakdown !== false && (
+            <div className="bg-[#FAF7F0] p-4 rounded-2xl border border-[#E6DCce] space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                  2. Price Breakdown
                 </span>
-                <span>−₹{discountAmount}</span>
-              </div>
-            )}
-
-            {/* Coupon Discount Row (If applied) */}
-            {couponDiscount > 0 && (
-              <div className="flex justify-between text-xs text-emerald-800 font-semibold bg-emerald-50 -mx-1 px-1.5 py-1 rounded-lg border border-emerald-300">
-                <span className="flex items-center gap-1">
-                  <Ticket className="w-3 h-3 text-emerald-700" />
-                  <span>Coupon Discount ({couponCode}):</span>
+                <span className="text-[11px] text-stone-500 font-medium">
+                  {quantity} {quantity === 1 ? 'item' : 'items'}
                 </span>
-                <span>−₹{couponDiscount}</span>
               </div>
-            )}
 
-            {/* Subtotal */}
-            <div className="flex justify-between text-xs text-stone-600">
-              <span>Subtotal:</span>
-              <span className="font-semibold text-stone-900">₹{subtotal}</span>
-            </div>
+              {/* Base Amount */}
+              <div className="flex justify-between text-xs text-stone-600">
+                <span>Product Price ({quantity} × ₹{unitPrice}):</span>
+                <span className="font-semibold text-stone-900">₹{baseAmount}</span>
+              </div>
 
-            {/* Delivery Charge */}
-            <div className="flex justify-between text-xs text-stone-600">
-              <span className="flex items-center gap-1.5">
-                <span>Delivery:</span>
-                {isFreeDelivery && (
-                  <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-1.5 py-0.5 rounded-full">
-                    FREE Delivery
+              {/* Discount Row (If applied) */}
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-xs text-emerald-800 font-semibold bg-emerald-50/80 -mx-1 px-1.5 py-1 rounded-lg border border-emerald-200/60">
+                  <span className="flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-emerald-700" />
+                    <span>Store Discount {discountType === 'percentage' ? `(${discountValue}%)` : ''}:</span>
                   </span>
-                )}
-              </span>
-              <span className={`font-semibold ${isFreeDelivery ? 'text-emerald-700 font-bold' : 'text-stone-900'}`}>
-                {isFreeDelivery ? 'FREE (₹0)' : `₹${deliveryCharge}`}
-              </span>
-            </div>
+                  <span>−₹{discountAmount}</span>
+                </div>
+              )}
 
-            {/* Free Delivery incentive if not yet free */}
-            {!isFreeDelivery && storeSettings.freeDeliveryThreshold > 0 && subtotal < storeSettings.freeDeliveryThreshold && (
-              <div className="text-[11px] text-amber-800 bg-amber-50/80 border border-amber-200/80 rounded-xl px-2.5 py-1 flex items-center justify-between">
-                <span>Add ₹{Math.max(0, storeSettings.freeDeliveryThreshold - subtotal)} more for Free Delivery!</span>
-                <span className="text-[10px] text-amber-700 font-bold">(Eligible at ₹{storeSettings.freeDeliveryThreshold})</span>
+              {/* Coupon Discount Row (If applied) */}
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-xs text-emerald-800 font-semibold bg-emerald-50 -mx-1 px-1.5 py-1 rounded-lg border border-emerald-300">
+                  <span className="flex items-center gap-1">
+                    <Ticket className="w-3 h-3 text-emerald-700" />
+                    <span>Coupon Discount ({couponCode}):</span>
+                  </span>
+                  <span>−₹{couponDiscount}</span>
+                </div>
+              )}
+
+              {/* Subtotal */}
+              <div className="flex justify-between text-xs text-stone-600">
+                <span>Subtotal:</span>
+                <span className="font-semibold text-stone-900">₹{subtotal}</span>
               </div>
-            )}
 
-            {/* Total Payable Amount */}
-            <div className="pt-2.5 border-t border-[#DFD3C1] flex justify-between items-baseline">
-              <div>
-                <span className="text-sm font-extrabold text-emerald-950 block">
-                  Final Payable Amount:
+              {/* Delivery Charge */}
+              <div className="flex justify-between text-xs text-stone-600">
+                <span className="flex items-center gap-1.5">
+                  <span>Delivery:</span>
+                  {isFreeDelivery && (
+                    <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                      FREE Delivery
+                    </span>
+                  )}
                 </span>
-                <span className="text-[11px] text-stone-500">
-                  Inclusive of all taxes & delivery
+                <span className={`font-semibold ${isFreeDelivery ? 'text-emerald-700 font-bold' : 'text-stone-900'}`}>
+                  {isFreeDelivery ? 'FREE (₹0)' : `₹${deliveryCharge}`}
                 </span>
               </div>
-              <span className="text-xl sm:text-2xl font-black text-emerald-900 font-serif">
-                ₹{finalTotal}
-              </span>
-            </div>
 
-            {/* Total Savings banner */}
-            {totalSavings > 0 && (
-              <div className="mt-1 text-[11px] font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-300/80 rounded-xl py-1.5 px-3 flex items-center justify-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>You save ₹{totalSavings} on this order!</span>
+              {/* Free Delivery incentive if not yet free */}
+              {!isFreeDelivery && storeSettings.freeDeliveryThreshold > 0 && subtotal < storeSettings.freeDeliveryThreshold && (
+                <div className="text-[11px] text-amber-800 bg-amber-50/80 border border-amber-200/80 rounded-xl px-2.5 py-1 flex items-center justify-between">
+                  <span>Add ₹{Math.max(0, storeSettings.freeDeliveryThreshold - subtotal)} more for Free Delivery!</span>
+                  <span className="text-[10px] text-amber-700 font-bold">(Eligible at ₹{storeSettings.freeDeliveryThreshold})</span>
+                </div>
+              )}
+
+              {/* Total Payable Amount */}
+              <div className="pt-2.5 border-t border-[#DFD3C1] flex justify-between items-baseline">
+                <div>
+                  <span className="text-sm font-extrabold text-emerald-950 block">
+                    Final Payable Amount:
+                  </span>
+                  <span className="text-[11px] text-stone-500">
+                    Inclusive of all taxes & delivery
+                  </span>
+                </div>
+                <span className="text-xl sm:text-2xl font-black text-emerald-900 font-serif">
+                  ₹{finalTotal}
+                </span>
               </div>
-            )}
-          </div>
+
+              {/* Total Savings banner */}
+              {totalSavings > 0 && (
+                <div className="mt-1 text-[11px] font-bold text-emerald-800 bg-emerald-100/70 border border-emerald-300/80 rounded-xl py-1.5 px-3 flex items-center justify-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>You save ₹{totalSavings} on this order!</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Section 4: Payment Options (Only UPI and COD) */}
           <div className="space-y-3">
@@ -712,7 +808,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {/* UPI Option */}
-              {storeSettings.enableUpi && (
+              {isUpiAllowed && (
                 <label 
                   className={`p-3.5 rounded-2xl border-2 cursor-pointer flex flex-col justify-between transition-all ${
                     paymentMethod === 'upi'
@@ -744,7 +840,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
 
               {/* Cash On Delivery Option */}
-              {storeSettings.enableCod && (
+              {isCodAllowed && (
                 <label 
                   className={`p-3.5 rounded-2xl border-2 cursor-pointer flex flex-col justify-between transition-all ${
                     paymentMethod === 'cod'
@@ -777,21 +873,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
 
             {/* UPI Details Box (Shown when UPI is selected) */}
-            {paymentMethod === 'upi' && storeSettings.enableUpi && (
+            {paymentMethod === 'upi' && isUpiAllowed && (
               <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3.5 mt-3 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
                     <CreditCard className="w-4 h-4 text-emerald-800" />
                     <span>UPI Payment Details</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowQrCode(!showQrCode)}
-                    className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-stone-200 shadow-xs cursor-pointer"
-                  >
-                    <QrCode className="w-3.5 h-3.5" />
-                    <span>{showQrCode ? 'Hide QR' : 'Show QR Code'}</span>
-                  </button>
+                  {ds.checkoutShowUpiQr !== false && (
+                    <button
+                      type="button"
+                      onClick={() => setShowQrCode(!showQrCode)}
+                      className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 bg-white px-2 py-1 rounded-md border border-stone-200 shadow-xs cursor-pointer"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>{showQrCode ? 'Hide QR' : 'Show QR Code'}</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Configured UPI ID Row */}
@@ -830,7 +928,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
 
                 {/* Working UPI QR Code with exact amount and details */}
-                {showQrCode && qrCodeDataUrl && (
+                {ds.checkoutShowUpiQr !== false && showQrCode && qrCodeDataUrl && (
                   <div className="bg-white p-4 rounded-xl border border-stone-200 text-center flex flex-col items-center">
                     <img
                       src={qrCodeDataUrl}
@@ -884,12 +982,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
 
                 {/* Requirement 5: Clear notice about WhatsApp screenshot verification */}
-                <div className="p-3 bg-emerald-900/5 rounded-xl border border-emerald-800/15 text-emerald-950 text-xs flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-                  <p className="leading-relaxed">
-                    <strong>Payment Verification:</strong> After placing the order, you may send your payment screenshot on WhatsApp for verification.
-                  </p>
-                </div>
+                {ds.checkoutShowUpiVerificationNote !== false && (
+                  <div className="p-3 bg-emerald-900/5 rounded-xl border border-emerald-800/15 text-emerald-950 text-xs flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                    <p className="leading-relaxed">
+                      <strong>Payment Verification:</strong> After placing the order, you may send your payment screenshot on WhatsApp for verification.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -926,7 +1026,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             ) : (
               <>
                 <MessageCircle className="w-6 h-6 text-amber-300 fill-emerald-900" />
-                <span>{storeSettings.buttons.whatsappOrder || 'PLACE ORDER ON WHATSAPP'}</span>
+                <span>{ds.checkoutSubmitButtonText || storeSettings.buttons?.whatsappOrder || 'PLACE ORDER ON WHATSAPP'}</span>
                 <span className="text-emerald-200 text-sm font-normal">
                   (₹{totalAmount})
                 </span>

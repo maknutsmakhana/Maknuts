@@ -268,6 +268,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             faqContactButtonText: data.faqContactButtonText || DEFAULT_SETTINGS.faqContactButtonText,
             seo: { ...DEFAULT_SETTINGS.seo, ...(data.seo || {}) },
             whatsAppSettings: { ...DEFAULT_SETTINGS.whatsAppSettings, ...(data.whatsAppSettings || {}) },
+            orderDisplaySettings: {
+              ...DEFAULT_SETTINGS.orderDisplaySettings,
+              ...(data.orderDisplaySettings || {}),
+              ...(data.whatsAppSettings?.orderDisplaySettings || {})
+            },
             socialLinks: { ...DEFAULT_SETTINGS.socialLinks, ...(data.socialLinks || {}) },
             mediaLibrary: Array.isArray(data.mediaLibrary) ? data.mediaLibrary : DEFAULT_SETTINGS.mediaLibrary,
           });
@@ -587,6 +592,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       whatsAppSettings: {
         ...storeSettings.whatsAppSettings,
         ...(updated.whatsAppSettings || {})
+      },
+      orderDisplaySettings: {
+        ...DEFAULT_SETTINGS.orderDisplaySettings,
+        ...(storeSettings.orderDisplaySettings || {}),
+        ...(updated.orderDisplaySettings || {}),
+        ...(updated.whatsAppSettings?.orderDisplaySettings || {})
       },
       socialLinks: {
         ...storeSettings.socialLinks,

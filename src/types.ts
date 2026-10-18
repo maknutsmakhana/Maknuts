@@ -172,6 +172,58 @@ export interface SeoSettings {
   imageAltText?: string;
 }
 
+export interface OrderDisplaySettings {
+  // WhatsApp Order Message Display Toggles
+  useStructuredFormat?: boolean; // Default true: produces the clean, structured receipt
+  showOrderHeader?: boolean;
+  showOrderId?: boolean;
+  showOrderDate?: boolean;
+  showCustomerDetails?: boolean;
+  showCustomerName?: boolean;
+  showCustomerPhone?: boolean;
+  showCustomerAddress?: boolean;
+  showCustomerPincode?: boolean;
+  
+  showOrderDetails?: boolean;
+  showProductName?: boolean;
+  showUnitPrice?: boolean;
+  showQuantity?: boolean;
+  showBaseAmount?: boolean;
+  showDiscount?: boolean;
+  showCouponDiscount?: boolean;
+  showSubtotal?: boolean;
+  showDeliveryCharge?: boolean;
+  showFinalPayableAmount?: boolean;
+
+  showPaymentMethod?: boolean;
+  showUpiTransactionId?: boolean;
+  showPaymentVerificationNote?: boolean;
+  showCodNotice?: boolean;
+  showCustomerNote?: boolean;
+  showClosingText?: boolean;
+  closingText?: string;
+
+  // Checkout Ordering Controls (During order submission by customer)
+  checkoutShowCustomerName?: boolean;
+  checkoutShowPhone?: boolean;
+  checkoutShowAddress?: boolean;
+  checkoutRequireAddress?: boolean;
+  checkoutShowPincode?: boolean;
+  checkoutRequirePincode?: boolean;
+  checkoutShowLandmark?: boolean;
+  checkoutShowAlternatePhone?: boolean;
+  checkoutShowCustomerNote?: boolean;
+  checkoutAllowUpi?: boolean;
+  checkoutAllowCod?: boolean;
+  checkoutShowUpiQr?: boolean;
+  checkoutShowUpiVerificationNote?: boolean;
+  checkoutShowEstimatedDelivery?: boolean;
+  checkoutEstimatedDeliveryText?: string;
+  checkoutShowCouponInput?: boolean;
+  checkoutShowPriceBreakdown?: boolean;
+  checkoutSubmitButtonText?: string;
+}
+
 export interface WhatsAppSettings {
   businessNumber?: string;
   supportNumber?: string;
@@ -183,6 +235,7 @@ export interface WhatsAppSettings {
   enabled?: boolean;
   enableFloatingButton?: boolean;
   phoneNumber?: string; // backwards compatibility alias
+  orderDisplaySettings?: OrderDisplaySettings;
 }
 
 export interface FlashOfferSettings {
@@ -343,6 +396,7 @@ export interface StoreSettings {
   faqs?: FaqItem[];
   seo?: SeoSettings;
   whatsAppSettings?: WhatsAppSettings;
+  orderDisplaySettings?: OrderDisplaySettings;
   socialLinks?: SocialLinksSettings;
   mediaLibrary?: MediaItem[];
 }
@@ -388,7 +442,11 @@ export interface Order {
   orderNumber: string; // e.g. "MK-261008-A7F3"
   customerName: string;
   phone: string;
+  alternatePhone?: string;
   address: string;
+  landmark?: string;
+  city?: string;
+  state?: string;
   pincode: string;
   productId: string;
   productName: string;

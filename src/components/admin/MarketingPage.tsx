@@ -61,7 +61,7 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
   );
   const [orderTemplate, setOrderTemplate] = useState(
     settings.whatsAppSettings?.orderTemplate ||
-    '🌿 *NEW ORDER - MAKNUTS* 🌿\n\n📦 *Order ID:* {{orderId}}\n👤 *Name:* {{customerName}}\n🛒 *Product:* {{productName}} (Qty: {{quantity}})\n💰 *Total:* ₹{{total}}\n💳 *Payment Method:* {{paymentMethod}}\n{{utr}}\n\nPlease confirm my order and send dispatch details. Thank you!'
+    '🌿 *NEW ORDER - MAKNUTS* 🌿\n\n📦 *Order ID:* {{orderId}}\n👤 *Customer Name:* {{customerName}}\n📱 *Mobile:* {{phone}}\n📍 *Delivery Address:* {{address}}, PIN: {{pincode}}\n🛒 *Product:* {{productName}} (Qty: {{quantity}})\n💰 *Total:* ₹{{total}}\n💳 *Payment Method:* {{paymentMethod}}\n{{utr}}\n\nPlease confirm my order and send dispatch details. Thank you!'
   );
   const [paymentTemplate, setPaymentTemplate] = useState(
     settings.whatsAppSettings?.paymentTemplate ||
@@ -145,11 +145,14 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
     const rendered = renderWhatsAppTemplate(orderTemplate, {
       orderId: 'MK-2610-A7F',
       customerName: 'Ramesh Kumar',
+      phone: '+91 98765 43210',
+      address: 'House 42, Green Park Road, Darbhanga',
+      pincode: '846004',
       productName: 'Maknuts Jumbo 250g',
       quantity: 2,
       total: 598,
-      paymentMethod: 'UPI',
-      utr: '629810482910'
+      paymentMethod: 'Cash on Delivery',
+      utr: ''
     });
     setTestPreviewText(rendered);
     const url = createWhatsAppUrl(businessNumber, rendered);
@@ -263,6 +266,9 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
             <div className="flex flex-wrap gap-1.5 text-[11px] font-mono">
               <span className="px-2 py-0.5 bg-white border border-emerald-300 rounded-md text-emerald-900 font-bold">{'{{orderId}}'}</span>
               <span className="px-2 py-0.5 bg-white border border-emerald-300 rounded-md text-emerald-900 font-bold">{'{{customerName}}'}</span>
+              <span className="px-2 py-0.5 bg-amber-50 border border-amber-300 rounded-md text-amber-950 font-bold">{'{{phone}}'}</span>
+              <span className="px-2 py-0.5 bg-amber-50 border border-amber-300 rounded-md text-amber-950 font-bold">{'{{address}}'}</span>
+              <span className="px-2 py-0.5 bg-amber-50 border border-amber-300 rounded-md text-amber-950 font-bold">{'{{pincode}}'}</span>
               <span className="px-2 py-0.5 bg-white border border-emerald-300 rounded-md text-emerald-900 font-bold">{'{{productName}}'}</span>
               <span className="px-2 py-0.5 bg-white border border-emerald-300 rounded-md text-emerald-900 font-bold">{'{{quantity}}'}</span>
               <span className="px-2 py-0.5 bg-white border border-emerald-300 rounded-md text-emerald-900 font-bold">{'{{total}}'}</span>
@@ -270,7 +276,7 @@ export const MarketingPage: React.FC<MarketingPageProps> = ({
               <span className="px-2 py-0.5 bg-white border border-emerald-300 rounded-md text-emerald-900 font-bold">{'{{utr}}'}</span>
             </div>
             <p className="text-[11px] text-stone-600">
-              When an order is created, these tokens will be replaced with real purchase parameters automatically.
+              When an order is created, customer contact, delivery address, items, and pricing tokens will be replaced with real purchase parameters automatically.
             </p>
           </div>
 

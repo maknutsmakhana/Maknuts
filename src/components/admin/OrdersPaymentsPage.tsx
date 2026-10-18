@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { downloadOrderInvoicePdf, downloadOrdersReportPdf } from '../../utils/pdfGenerator';
 import { createWhatsAppUrl } from '../../utils/whatsapp';
+import { OrderDisplayControlsTab } from './OrderDisplayControlsTab';
 
 interface OrdersPaymentsPageProps {
   orders: Order[];
@@ -43,6 +44,7 @@ interface OrdersPaymentsPageProps {
   onDeleteOrder: (orderId: string) => Promise<void>;
   onArchiveAllOrders: () => Promise<number>;
   onClearAllOrders: () => Promise<void>;
+  onSaveSettings?: (updated: Partial<StoreSettings>) => Promise<void>;
   initialTab?: string;
   initialSelectedOrder?: Order | null;
   onSubTabChange?: (tab: string) => void;
@@ -57,6 +59,7 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
   onDeleteOrder,
   onArchiveAllOrders,
   onClearAllOrders,
+  onSaveSettings,
   initialTab = 'all',
   initialSelectedOrder = null,
   onSubTabChange,
@@ -65,11 +68,12 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
     if (!tab) return 'all';
     if (tab === 'orders') return 'all';
     if (tab === 'payments') return 'upi_verification';
+    if (tab === 'order_controls' || tab === 'checkout_controls') return 'order_controls';
     return tab;
   };
 
   const [activeTab, setActiveTab] = useState<
-    'all' | 'Pending' | 'Confirmed' | 'Shipped' | 'Delivered' | 'Cancelled' | 'upi_verification' | 'cod' | 'refunds' | 'shipping_tracking' | 'invoices' | 'archive'
+    'all' | 'Pending' | 'Confirmed' | 'Shipped' | 'Delivered' | 'Cancelled' | 'upi_verification' | 'cod' | 'refunds' | 'shipping_tracking' | 'invoices' | 'order_controls' | 'archive'
   >((mapInitialTab(initialTab) as any) || 'all');
 
   React.useEffect(() => {
@@ -270,6 +274,7 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
             { id: 'cod', label: `COD (${orders.filter(o => o.paymentMethod === 'cod').length})` },
             { id: 'shipping_tracking', label: 'Shipping & AWB' },
             { id: 'invoices', label: 'Invoices' },
+            { id: 'order_controls', label: 'Order Form & WhatsApp ⚙️' },
             { id: 'archive', label: 'Archive & Safety' },
           ].map((tab) => (
             <button
@@ -287,6 +292,14 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
           ))}
         </div>
       </div>
+
+      {/* SUB-VIEW: ORDER & CHECKOUT DISPLAY CONTROLS TAB */}
+      {activeTab === 'order_controls' && (
+        <OrderDisplayControlsTab
+          settings={storeSettings}
+          onSaveSettings={onSaveSettings || (async () => {})}
+        />
+      )}
 
       {/* SUB-VIEW: ARCHIVE & PURGE SAFETY TAB */}
       {activeTab === 'archive' && (
@@ -347,7 +360,7 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
       )}
 
       {/* STANDARD ORDERS TABLE VIEW */}
-      {activeTab !== 'archive' && (
+      {activeTab !== 'archive' && activeTab !== 'order_controls' && (
         <div className="space-y-4">
           {/* Search bar */}
           <div className="bg-white p-3 rounded-2xl border border-stone-200/90 shadow-2xs flex items-center justify-between gap-3">

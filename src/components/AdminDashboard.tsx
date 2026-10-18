@@ -558,6 +558,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   onDeleteOrder={deleteOrder}
                   onArchiveAllOrders={archiveAllOrders}
                   onClearAllOrders={clearAllOrders}
+                  onSaveSettings={updateSettings}
                   initialTab={activeSubTab}
                   initialSelectedOrder={selectedOrderForModal}
                   onSubTabChange={(sub: string) => setActiveSubTab(sub)}

@@ -1,5 +1,57 @@
-import { Product, StoreSettings } from './types';
+import { Product, StoreSettings, OrderDisplaySettings } from './types';
 import defaultProductImage from './assets/images/maknuts_makhana_pouch_1791179105818.jpg';
+
+export const DEFAULT_ORDER_DISPLAY_SETTINGS: OrderDisplaySettings = {
+  // WhatsApp Order Message Display Toggles (Matches authoritative screenshot receipt layout)
+  useStructuredFormat: true,
+  showOrderHeader: true,
+  showOrderId: true,
+  showOrderDate: true,
+  showCustomerDetails: true,
+  showCustomerName: true,
+  showCustomerPhone: true,
+  showCustomerAddress: true,
+  showCustomerPincode: true,
+
+  showOrderDetails: true,
+  showProductName: true,
+  showUnitPrice: true,
+  showQuantity: true,
+  showBaseAmount: true,
+  showDiscount: true,
+  showCouponDiscount: true,
+  showSubtotal: true,
+  showDeliveryCharge: true,
+  showFinalPayableAmount: true,
+
+  showPaymentMethod: true,
+  showUpiTransactionId: true,
+  showPaymentVerificationNote: true,
+  showCodNotice: true,
+  showCustomerNote: true,
+  showClosingText: true,
+  closingText: 'Please confirm my order and send dispatch details. Thank you!',
+
+  // Customer Checkout Modal Controls (During ordering by customer)
+  checkoutShowCustomerName: true,
+  checkoutShowPhone: true,
+  checkoutShowAddress: true,
+  checkoutRequireAddress: true,
+  checkoutShowPincode: true,
+  checkoutRequirePincode: true,
+  checkoutShowLandmark: true,
+  checkoutShowAlternatePhone: false,
+  checkoutShowCustomerNote: true,
+  checkoutAllowUpi: true,
+  checkoutAllowCod: true,
+  checkoutShowUpiQr: true,
+  checkoutShowUpiVerificationNote: true,
+  checkoutShowEstimatedDelivery: true,
+  checkoutEstimatedDeliveryText: 'Dispatched within 24 hours · Delivery in 2-4 business days across India',
+  checkoutShowCouponInput: true,
+  checkoutShowPriceBreakdown: true,
+  checkoutSubmitButtonText: 'PLACE ORDER ON WHATSAPP',
+};
 
 export const DEFAULT_PRODUCT: Product = {
   id: 'maknuts-makhana-jumbo-250g',
@@ -399,12 +451,14 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   whatsAppSettings: {
     businessNumber: '917801051792',
     supportNumber: '917801051792',
-    orderTemplate: '🌿 *NEW ORDER - MAKNUTS* 🌿\n\n📦 *Order ID:* {{orderId}}\n👤 *Name:* {{customerName}}\n🛒 *Product:* {{productName}} (Qty: {{quantity}})\n💰 *Total:* ₹{{total}}\n💳 *Payment Method:* {{paymentMethod}}\n{{utr}}\n\nPlease confirm my order and send dispatch details. Thank you!',
+    orderTemplate: '🌿 *NEW ORDER - MAKNUTS* 🌿\n\n📦 *Order ID:* {{orderId}}\n👤 *Customer Name:* {{customerName}}\n📱 *Mobile:* {{phone}}\n📍 *Delivery Address:* {{address}}, PIN: {{pincode}}\n🛒 *Product:* {{productName}} (Qty: {{quantity}})\n💰 *Total:* ₹{{total}}\n💳 *Payment Method:* {{paymentMethod}}\n{{utr}}\n\nPlease confirm my order and send dispatch details. Thank you!',
     paymentTemplate: 'Hi {{customerName}}, we have received your payment of ₹{{total}} for Order #{{orderId}}. Your fresh harvest Makhana is scheduled for dispatch.',
     supportTemplate: 'Hello Maknuts Support! I have a question regarding an order or product quality.',
     enabled: true,
     enableFloatingButton: true,
+    orderDisplaySettings: DEFAULT_ORDER_DISPLAY_SETTINGS,
   },
+  orderDisplaySettings: DEFAULT_ORDER_DISPLAY_SETTINGS,
   socialLinks: {
     instagram: 'https://instagram.com/maknutsmakhana',
     facebook: 'https://facebook.com/maknutsmakhana',
