@@ -1,14 +1,15 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { Truck } from 'lucide-react';
+import { Truck, ShieldCheck } from 'lucide-react';
 import maknutsLogo from '../assets/images/regenerated_image_1791357700332.png';
 
 interface HeaderProps {
   onOpenTracking: () => void;
   onOpenPolicies: (type: 'terms' | 'privacy' | 'returns' | 'shipping') => void;
+  onOpenAdmin?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenTracking }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenTracking, onOpenAdmin }) => {
   const { storeSettings, products, activeProduct, setActiveProductId } = useStore();
 
   return (
@@ -44,14 +45,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTracking }) => {
 
         {/* If multiple products exist, quick switcher */}
         {products.length > 1 && (
-          <div className="hidden sm:flex items-center gap-1 bg-amber-50/80 p-1 rounded-lg border border-amber-200/60 text-xs overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1 bg-amber-50/80 p-1 rounded-lg border border-amber-200/60 text-xs overflow-x-auto no-scrollbar max-w-[130px] sm:max-w-xs md:max-w-md">
             {products.map(p => (
               <button
                 key={p.id}
                 onClick={() => setActiveProductId(p.id)}
-                className={`px-2.5 py-1 rounded-md font-medium transition-all whitespace-nowrap ${
+                className={`px-2 py-1 rounded-md font-bold text-[11px] sm:text-xs transition-all whitespace-nowrap cursor-pointer ${
                   p.id === activeProduct.id
-                    ? 'bg-emerald-900 text-white shadow-xs'
+                    ? 'bg-emerald-900 text-amber-200 shadow-xs'
                     : 'text-emerald-900/80 hover:text-emerald-950 hover:bg-amber-100/50'
                 }`}
               >
@@ -62,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTracking }) => {
         )}
 
         {/* Top Actions: Track Order */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Customer Track Order Button */}
           <button
             type="button"

@@ -183,6 +183,7 @@ export interface OrderDisplaySettings {
   showCustomerPhone?: boolean;
   showCustomerAddress?: boolean;
   showCustomerPincode?: boolean;
+  showGoogleMapsLocation?: boolean;
   
   showOrderDetails?: boolean;
   showProductName?: boolean;
@@ -213,11 +214,14 @@ export interface OrderDisplaySettings {
   checkoutShowPincode?: boolean;
   checkoutRequirePincode?: boolean;
   checkoutShowLandmark?: boolean;
+  checkoutShowGoogleMapLocation?: boolean;
+  checkoutRequireGoogleMapLocation?: boolean;
   checkoutShowAlternatePhone?: boolean;
   checkoutShowCustomerNote?: boolean;
   checkoutAllowUpi?: boolean;
   checkoutAllowCod?: boolean;
   checkoutShowUpiQr?: boolean;
+  checkoutShowPayWithUpiApp?: boolean;
   checkoutShowUpiVerificationNote?: boolean;
   checkoutShowEstimatedDelivery?: boolean;
   checkoutEstimatedDeliveryText?: string;
@@ -338,6 +342,8 @@ export interface StoreSettings {
   brandBadge: string;
   bannerText: string;
   bannerVisible: boolean;
+  defaultProductId?: string; // Primary showcase product displayed when opening storefront
+  googleMapsApiKey?: string; // Optional Google Maps Platform API key
   
   // Pricing, Discount & Order Controls
   deliveryCharge: number;
@@ -457,6 +463,8 @@ export interface Order {
   city?: string;
   state?: string;
   pincode: string;
+  googleMapsUrl?: string;
+  coordinates?: { lat: number; lng: number };
   productId: string;
   productName: string;
   productWeight: string;

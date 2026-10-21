@@ -84,6 +84,11 @@ export const downloadOrderInvoicePdf = (order: Order, store: StoreSettings) => {
   const addressLines = doc.splitTextToSize(`${order.address || ''}`, (pageWidth - 32) / 2 - 8);
   doc.text(addressLines.slice(0, 2), 18, y + 22);
   doc.text(`Pincode: ${order.pincode || 'N/A'}`, 18, y + 33);
+  if (order.googleMapsUrl || order.coordinates) {
+    const mapStr = order.googleMapsUrl || `https://maps.google.com/?q=${order.coordinates?.lat},${order.coordinates?.lng}`;
+    doc.setTextColor(16, 120, 60);
+    doc.text(`Maps Pin: ${mapStr.substring(0, 38)}`, 18, y + 38);
+  }
 
   // Right Col: Order Meta
   const rightX = 14 + (pageWidth - 32) / 2 + 8;

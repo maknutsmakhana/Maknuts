@@ -78,6 +78,28 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
     }
   }, [initialSection]);
 
+  // Sync form state when storeSettings updates externally (e.g. from Firestore sync)
+  React.useEffect(() => {
+    if (!isSaving && settings) {
+      setForm(prev => ({
+        ...prev,
+        ...settings,
+        heroSection: { ...(prev.heroSection || {}), ...(settings.heroSection || {}) },
+        promoBanner: { ...(prev.promoBanner || {}), ...(settings.promoBanner || {}) },
+        buttons: { ...(prev.buttons || {}), ...(settings.buttons || {}) },
+        benefitsSection: { ...(prev.benefitsSection || {}), ...(settings.benefitsSection || {}) },
+        reviewsSection: { ...(prev.reviewsSection || {}), ...(settings.reviewsSection || {}) },
+        gallerySection: { ...(prev.gallerySection || {}), ...(settings.gallerySection || {}) },
+        footerText: { ...(prev.footerText || {}), ...(settings.footerText || {}) },
+        policies: { ...(prev.policies || {}), ...(settings.policies || {}) },
+        sectionVisibility: { ...(prev.sectionVisibility || {}), ...(settings.sectionVisibility || {}) },
+        sectionOrder: (Array.isArray(settings.sectionOrder) && settings.sectionOrder.length > 0)
+          ? settings.sectionOrder
+          : prev.sectionOrder,
+      }));
+    }
+  }, [settings, isSaving]);
+
   const handleSelectEditor = (id: string) => {
     setActiveSectionEditor(id);
     onSubTabChange?.(id);
@@ -1866,6 +1888,42 @@ export const AdminStorefrontTab: React.FC<AdminStorefrontTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Sticky Bottom Save / Publish Bar */}
+      <div className="sticky bottom-0 z-30 bg-white/95 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-stone-200/90 shadow-xl flex items-center justify-between gap-3 mt-6">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-bold text-stone-700">
+            Storefront Settings: <span className="text-emerald-950 font-serif">{form.shopName || 'Maknuts'}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onPreviewStorefront()}
+            className="px-3.5 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Open customer storefront view"
+          >
+            <Eye className="w-3.5 h-3.5 text-emerald-800" />
+            <span>View Live Store</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="px-5 py-2 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+          >
+            {isSaving ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : saveToast ? (
+              <Check className="w-4 h-4 text-amber-300" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>{saveToast ? 'Published Live!' : isSaving ? 'Saving...' : 'Save & Publish Live'}</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

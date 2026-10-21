@@ -48,6 +48,9 @@ export interface WhatsAppTemplateData {
   note?: string;
   trackingUrl?: string;
   supportPhone?: string;
+  googleMapsUrl?: string;
+  mapLocation?: string;
+  mapsUrl?: string;
 }
 
 /**
@@ -80,12 +83,18 @@ export function renderWhatsAppTemplate(template: string, data: WhatsAppTemplateD
   message = message.replace(/\{\{supportPhone\}\}/gi, data.supportPhone || '+91 78010 51792');
   message = message.replace(/\{\{productName\}\}/gi, data.productName || 'Maknuts Makhana');
   message = message.replace(/\{\{productWeight\}\}/gi, data.productWeight || '');
-  message = message.replace(/\{\{quantity\}\}/gi, String(data.quantity || 1));
+  const mapLocation = data.googleMapsUrl || data.mapLocation || data.mapsUrl || '';
+  message = message.replace(/\{\{googleMapsUrl\}\}/gi, mapLocation);
+  message = message.replace(/\{\{mapLocation\}\}/gi, mapLocation);
+  message = message.replace(/\{\{mapsUrl\}\}/gi, mapLocation);
   message = message.replace(/\{\{total\}\}/gi, amt);
   message = message.replace(/\{\{utr\}\}/gi, data.utr ? `📝 *UTR:* ${data.utr}` : '');
   message = message.replace(/\{\{note\}\}/gi, data.note ? `💬 *Note:* ${data.note}` : '');
 
   // Backwards compatibility for single-brace templates
+  message = message.replace(/\{googleMapsUrl\}/gi, mapLocation);
+  message = message.replace(/\{mapLocation\}/gi, mapLocation);
+  message = message.replace(/\{mapsUrl\}/gi, mapLocation);
   message = message.replace(/\{orderId\}/gi, data.orderId || '');
   message = message.replace(/\{orderNumber\}/gi, data.orderId || '');
   message = message.replace(/\{order_id\}/gi, data.orderId || '');
@@ -218,6 +227,8 @@ export function generateOrderWhatsAppMessage(
       paymentMethod: order.paymentMethod === 'upi' ? 'UPI' : 'Cash on Delivery',
       utr: order.upiRefNumber,
       note: order.note,
+      googleMapsUrl: order.googleMapsUrl || (order.coordinates ? `https://maps.google.com/?q=${order.coordinates.lat},${order.coordinates.lng}` : ''),
+      mapLocation: order.googleMapsUrl || (order.coordinates ? `https://maps.google.com/?q=${order.coordinates.lat},${order.coordinates.lng}` : ''),
     });
     if (rendered) return rendered;
   }
@@ -243,7 +254,7 @@ export function generateOrderWhatsAppMessage(
     lines.push(`📅 *Date:* ${formatOrderDate(order.createdAt)}`);
   }
 
-  // 4. CUSTOMER DETAILS (Guaranteed to show Name, Mobile, Address, PIN Code)
+  // 4. CUSTOMER DETAILS (Guaranteed to show Name, Mobile, Address, PIN Code, Google Maps)
   if (ds.showCustomerDetails !== false) {
     const customerLines: string[] = [];
     if (ds.showCustomerName !== false && order.customerName) {
@@ -261,6 +272,10 @@ export function generateOrderWhatsAppMessage(
     }
     if (ds.showCustomerPincode !== false && order.pincode) {
       customerLines.push(`• *PIN Code:* ${order.pincode}`);
+    }
+    const effectiveMapUrl = order.googleMapsUrl || (order.coordinates ? `https://maps.google.com/?q=${order.coordinates.lat},${order.coordinates.lng}` : '');
+    if (ds.showGoogleMapsLocation !== false && effectiveMapUrl) {
+      customerLines.push(`• *Google Maps Location:* ${effectiveMapUrl}`);
     }
 
     if (customerLines.length > 0) {

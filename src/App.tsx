@@ -25,7 +25,7 @@ import { StoreSeoHead } from './components/StoreSeoHead';
 import { Order, SectionVisibility } from './types';
 
 function StoreFront() {
-  const { activeProduct, products, setActiveProductId, storeSettings } = useStore();
+  const { activeProduct, products, setActiveProductId, storeSettings, adminUser } = useStore();
 
   // Check whether current URL is dedicated admin backend route (/admin or #admin)
   const checkIsAdminRoute = () => {
@@ -54,14 +54,26 @@ function StoreFront() {
   const [trackingOrderId, setTrackingOrderId] = useState('');
   const [trackingPhone, setTrackingPhone] = useState('');
   const [activePolicy, setActivePolicy] = useState<'terms' | 'privacy' | 'returns' | 'shipping' | 'cancellation' | null>(null);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
 
+  // Global listener for Google Maps quota notification
+  useEffect(() => {
+    const handleQuota = () => setQuotaExceeded(true);
+    window.addEventListener('gmp-quota-exceeded', handleQuota);
+    return () => window.removeEventListener('gmp-quota-exceeded', handleQuota);
+  }, []);
 
-
-  // URL & Route listener for admin backend (/admin) & tracking (#track=...)
+  // URL & Route listener for admin backend (/admin), products (?product=...), & tracking (#track=...)
   useEffect(() => {
     const handleUrlChange = () => {
       const isRouteAdmin = checkIsAdminRoute();
       setIsAdminOpen(isRouteAdmin);
+
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlProduct = searchParams.get('product') || searchParams.get('p');
+      if (urlProduct) {
+        setActiveProductId(urlProduct);
+      }
 
       const hash = window.location.hash;
       if (hash.startsWith('#track')) {
@@ -70,6 +82,11 @@ function StoreFront() {
           setTrackingQuery(decodeURIComponent(parts[1]));
         }
         setIsTrackingOpen(true);
+      } else if (hash.startsWith('#product=')) {
+        const prodId = hash.replace('#product=', '').trim();
+        if (prodId) {
+          setActiveProductId(prodId);
+        }
       }
     };
 
@@ -132,6 +149,31 @@ function StoreFront() {
         activeProduct={activeProduct}
         isAdminOpen={isAdminOpen}
       />
+
+      {/* Google Maps Quota Warning Banner (if triggered) */}
+      {quotaExceeded && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm flex items-center justify-center gap-2">
+          <span>
+            Google Maps Platform quota reached. If you are the app owner, visit{' '}
+            <a
+              href="https://developers.google.com/maps/ai/ai-studio?utm_campaign=gmp_mcp_codeassist_v1_aistudio#quota_exceeded_errors"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-semibold text-amber-950 hover:text-amber-800"
+            >
+              maps developer site
+            </a>{' '}
+            for instructions to update your account.
+          </span>
+          <button
+            type="button"
+            onClick={() => setQuotaExceeded(false)}
+            className="text-xs font-bold text-amber-800 underline ml-2 cursor-pointer"
+          >
+            ✕ Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Top Notification Banner with Track Link */}
       {visibility.announcementBar !== false && (

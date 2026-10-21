@@ -24,6 +24,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
     setQuantity(prev => Math.min(Math.max(prev, minQty), maxQty));
   }, [minQty, maxQty]);
 
+  // Reset active image and quantity when displayed product changes
+  useEffect(() => {
+    setActiveImageIndex(0);
+    setQuantity(minQty);
+  }, [product.id, minQty]);
+
   // Multiple product images resolution
   const productImages = (product.images && product.images.length > 0)
     ? product.images

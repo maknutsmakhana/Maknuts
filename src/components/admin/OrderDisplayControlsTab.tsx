@@ -42,6 +42,19 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
   const [saveToast, setSaveToast] = useState(false);
   const [copiedPreview, setCopiedPreview] = useState(false);
   const [previewTab, setPreviewTab] = useState<'whatsapp' | 'checkout'>('whatsapp');
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState(settings.googleMapsApiKey || '');
+
+  // Sync controls when settings update from Firestore
+  React.useEffect(() => {
+    if (!isSaving && settings) {
+      setGoogleMapsApiKey(settings.googleMapsApiKey || '');
+      setControls({
+        ...DEFAULT_ORDER_DISPLAY_SETTINGS,
+        ...(settings.orderDisplaySettings || {}),
+        ...(settings.whatsAppSettings?.orderDisplaySettings || {})
+      });
+    }
+  }, [settings, isSaving]);
 
   // Sample order for live WhatsApp preview
   const sampleOrder: any = {
@@ -53,6 +66,7 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
     address: 'Flat 302, Green Park Residency, Gandhi Chowk, Patna',
     landmark: controls.checkoutShowLandmark ? 'Opp. City Mall, 3rd Floor' : undefined,
     pincode: '800001',
+    googleMapsUrl: controls.checkoutShowGoogleMapLocation !== false ? 'https://maps.google.com/?q=25.5941,85.1376' : undefined,
     productId: 'maknuts-makhana-jumbo-250g',
     productName: 'Maknuts Makhana',
     productWeight: '250g Pouch',
@@ -100,6 +114,7 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
     setIsSaving(true);
     try {
       await onSaveSettings({
+        googleMapsApiKey: googleMapsApiKey.trim(),
         orderDisplaySettings: controls,
         whatsAppSettings: {
           ...(settings.whatsAppSettings || {}),
@@ -126,6 +141,7 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
         showCustomerPhone: true,
         showCustomerAddress: true,
         showCustomerPincode: true,
+        showGoogleMapsLocation: true,
         showOrderDetails: true,
         showPaymentMethod: true,
         checkoutShowProductCard: true,
@@ -135,6 +151,8 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
         checkoutShowPincode: true,
         checkoutRequirePincode: true,
         checkoutShowLandmark: true,
+        checkoutShowGoogleMapLocation: true,
+        checkoutRequireGoogleMapLocation: false,
         checkoutShowCustomerNote: true,
         checkoutAllowUpi: true,
         checkoutAllowCod: true,
@@ -418,6 +436,56 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                 )}
               </div>
 
+              {/* Google Map Delivery Location Field */}
+              <div className="p-3 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Google Map Location & Live GPS Pin</span>
+                    </span>
+                    <span className="text-[11px] text-stone-500">Allow customers to detect device GPS coordinates or paste Google Maps location</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={controls.checkoutShowGoogleMapLocation !== false}
+                    onChange={() => handleToggle('checkoutShowGoogleMapLocation')}
+                    className="w-4 h-4 accent-emerald-800 rounded cursor-pointer"
+                  />
+                </div>
+                {controls.checkoutShowGoogleMapLocation !== false && (
+                  <div className="pt-2 border-t border-stone-200/60 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-stone-700">Require Google Map Location before checkout</span>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-stone-700">
+                        <input
+                          type="checkbox"
+                          checked={controls.checkoutRequireGoogleMapLocation === true}
+                          onChange={() => handleToggle('checkoutRequireGoogleMapLocation')}
+                          className="w-3.5 h-3.5 accent-emerald-800 rounded cursor-pointer"
+                        />
+                        <span>Mandatory</span>
+                      </label>
+                    </div>
+                    <div className="pt-1">
+                      <label className="block text-[11px] font-semibold text-stone-600 mb-1">
+                        Google Maps Platform API Key (Optional)
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="AIzaSy... (Leave blank to use built-in interactive map)"
+                        value={googleMapsApiKey}
+                        onChange={e => setGoogleMapsApiKey(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs font-mono bg-white border border-stone-300 rounded-lg text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                      />
+                      <p className="text-[10px] text-stone-500 mt-1">
+                        If left blank or without key, checkout uses the built-in interactive doorstep locator without requiring an external Google Maps account.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Landmark / Floor / Apartment */}
               <div className="flex items-center justify-between p-3 rounded-xl bg-stone-50 hover:bg-stone-100/80 border border-stone-200 transition-colors">
                 <div>
@@ -494,7 +562,7 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                       onChange={() => handleToggle('checkoutShowUpiQr')}
                       className="w-4 h-4 accent-emerald-800 rounded cursor-pointer"
                     />
-                    <span className="text-stone-700">Show UPI QR Code</span>
+                    <span className="text-stone-700">Show UPI QR Code (Hidden by default)</span>
                   </label>
 
                   <label className="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 cursor-pointer">
@@ -505,6 +573,19 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                       className="w-4 h-4 accent-emerald-800 rounded cursor-pointer"
                     />
                     <span className="text-stone-700">Show WhatsApp Screenshot Note</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 cursor-pointer sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={controls.checkoutShowPayWithUpiApp !== false}
+                      onChange={() => handleToggle('checkoutShowPayWithUpiApp')}
+                      className="w-4 h-4 accent-emerald-800 rounded cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-stone-800 font-semibold block">Show &quot;Pay with UPI App&quot; Direct Button</span>
+                      <span className="text-[10px] text-stone-500 block">Allows mobile customers to tap and launch their installed UPI app (GPay, PhonePe, Paytm, BHIM)</span>
+                    </div>
                   </label>
                 </div>
               </div>
@@ -761,6 +842,19 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                       className="w-3.5 h-3.5 accent-emerald-800 rounded cursor-pointer"
                     />
                     <span className="text-stone-800">Postal PIN Code</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 cursor-pointer col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={controls.showGoogleMapsLocation !== false}
+                      onChange={() => handleToggle('showGoogleMapsLocation')}
+                      className="w-3.5 h-3.5 accent-emerald-800 rounded cursor-pointer"
+                    />
+                    <span className="text-stone-800 font-semibold flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-emerald-700" />
+                      <span>Google Maps Location Link (for courier GPS navigation)</span>
+                    </span>
                   </label>
                 </div>
               )}
@@ -1129,6 +1223,19 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                       </div>
                     )}
 
+                    {controls.checkoutShowGoogleMapLocation !== false && (
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-stone-500 font-semibold flex items-center justify-between">
+                          <span>Google Map Delivery Location {controls.checkoutRequireGoogleMapLocation ? '*' : '(Recommended)'}</span>
+                          <span className="text-[9px] text-emerald-700 font-bold">📍 GPS Pin Attached</span>
+                        </span>
+                        <div className="p-2 bg-emerald-50/80 border border-emerald-200 rounded text-emerald-950 font-mono text-[10px] flex items-center justify-between">
+                          <span className="truncate">https://maps.google.com/?q=25.5941,85.1376</span>
+                          <span className="text-[9px] font-bold text-emerald-800 bg-white px-1.5 py-0.5 rounded border border-emerald-300 shrink-0 ml-1">Pin ↗</span>
+                        </div>
+                      </div>
+                    )}
+
                     {controls.checkoutShowCustomerNote !== false && (
                       <div className="space-y-0.5">
                         <span className="text-[10px] text-stone-500 font-semibold">Delivery Note</span>
@@ -1137,6 +1244,42 @@ export const OrderDisplayControlsTab: React.FC<OrderDisplayControlsTabProps> = (
                         </div>
                       </div>
                     )}
+                  </div>
+
+                  {/* Payment Options Mockup */}
+                  <div className="space-y-2 bg-white p-3 rounded-xl border border-stone-200">
+                    <span className="text-[11px] font-bold text-emerald-950 block">Payment Method</span>
+                    <div className="flex gap-2">
+                      <div className="flex-1 p-2 bg-emerald-50 border border-emerald-300 rounded-lg text-emerald-950 font-bold text-[11px] flex items-center justify-between">
+                        <span>UPI Payment</span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                      </div>
+                      {controls.checkoutAllowCod !== false && (
+                        <div className="flex-1 p-2 bg-stone-50 border border-stone-200 rounded-lg text-stone-600 font-medium text-[11px]">
+                          Cash on Delivery
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg space-y-2 text-[11px]">
+                      <div className="flex justify-between items-center text-stone-700">
+                        <span className="font-semibold">UPI ID: 7504805846@ibl</span>
+                        <span className="text-[9px] bg-emerald-800 text-white px-1.5 py-0.5 rounded font-bold">Copy</span>
+                      </div>
+
+                      {controls.checkoutShowUpiQr !== false && (
+                        <div className="p-1.5 bg-white border border-emerald-200 rounded text-center text-[10px] text-emerald-800 font-semibold">
+                          QR Code (Click to Expand / Scan)
+                        </div>
+                      )}
+
+                      {controls.checkoutShowPayWithUpiApp !== false && (
+                        <div className="p-2 bg-emerald-800 text-white rounded-lg text-center font-bold text-[10px] flex items-center justify-center gap-1">
+                          <ExternalLink className="w-3 h-3 text-amber-300" />
+                          <span>Pay with UPI App (GPay, PhonePe, Paytm, BHIM)</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Coupon Mockup */}

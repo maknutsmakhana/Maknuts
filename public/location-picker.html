@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pin Your Delivery Location · Maknuts Makhana</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #FAF8F5;
+      color: #1c1917;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: #064e3b;
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    header p {
+      font-size: 11px;
+      color: #a7f3d0;
+      margin-top: 2px;
+    }
+    .search-bar {
+      padding: 10px 14px;
+      background: #fff;
+      border-bottom: 1px solid #e7e5e4;
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .search-bar input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #d6d3d1;
+      border-radius: 10px;
+      font-size: 13px;
+      outline: none;
+    }
+    .search-bar input:focus {
+      border-color: #059669;
+      box-shadow: 0 0 0 2px rgba(5,150,105,0.2);
+    }
+    .btn {
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-gps {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      white-space: nowrap;
+    }
+    .btn-gps:hover { background: #d1fae5; }
+    .btn-search {
+      background: #064e3b;
+      color: #fff;
+    }
+    .btn-search:hover { background: #047857; }
+    #map-container {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    .center-pin-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -100%);
+      z-index: 1000;
+      pointer-events: none;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+    }
+    .center-pin-overlay svg {
+      width: 42px;
+      height: 42px;
+      display: block;
+    }
+    .center-shadow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px;
+      height: 6px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 50%;
+      z-index: 999;
+      pointer-events: none;
+    }
+    footer {
+      background: #fff;
+      border-top: 1px solid #e7e5e4;
+      padding: 12px 16px;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.05);
+      flex-shrink: 0;
+    }
+    .location-info {
+      font-size: 12px;
+      margin-bottom: 10px;
+      color: #44403c;
+      line-height: 1.4;
+    }
+    .location-address {
+      font-weight: 700;
+      color: #1c1917;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .coords-badge {
+      font-family: monospace;
+      font-size: 11px;
+      color: #065f46;
+      background: #ecfdf5;
+      padding: 2px 6px;
+      border-radius: 6px;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    .btn-confirm {
+      width: 100%;
+      padding: 12px;
+      background: #064e3b;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .btn-confirm:hover { background: #047857; }
+    .status-toast {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(28,25,23,0.9);
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 1001;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .status-toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>📍 Select Delivery Location</h1>
+      <p>Pan the map or click your exact house/building gate</p>
+    </div>
+    <button class="btn btn-gps" id="btn-gps" title="Find current GPS coordinates">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+      <span>Detect My GPS</span>
+    </button>
+  </header>
+
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="Search area, colony, street, landmark, city (e.g. Kankarbagh, Patna)..." />
+    <button class="btn btn-search" id="btn-search">Search</button>
+  </div>
+
+  <div id="map-container">
+    <div id="map"></div>
+    <div class="center-shadow"></div>
+    <div class="center-pin-overlay">
+      <svg viewBox="0 0 24 24" fill="#064e3b" stroke="#ffffff" stroke-width="1.5">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
+        <circle cx="12" cy="9" r="2.5" fill="#f59e0b"></circle>
+      </svg>
+    </div>
+    <div id="toast" class="status-toast">Detecting location...</div>
+  </div>
+
+  <footer>
+    <div class="location-info">
+      <div class="location-address" id="loc-address">Move map to place pin at your delivery address...</div>
+      <div class="coords-badge" id="loc-coords">Lat: --, Lng: --</div>
+    </div>
+    <button class="btn-confirm" id="btn-confirm">
+      <span>✓ Confirm & Use This Location</span>
+    </button>
+  </footer>
+
+  <script>
+    // Default coordinates: Patna, Bihar (Makhana heartland)
+    let currentLat = 25.5941;
+    let currentLng = 85.1376;
+    let currentAddress = 'Patna, Bihar';
+    let currentPincode = '800001';
+    let isGeocoding = false;
+    let geocodeTimeout = null;
+
+    const toast = document.getElementById('toast');
+    function showToast(msg, duration = 2500) {
+      toast.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    // Initialize Leaflet Map
+    const map = L.map('map', {
+      center: [currentLat, currentLng],
+      zoom: 15,
+      zoomControl: true
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    function updateCoordinatesDisplay(lat, lng) {
+      currentLat = lat;
+      currentLng = lng;
+      document.getElementById('loc-coords').innerText = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+      
+      // Debounce reverse geocoding to find address
+      clearTimeout(geocodeTimeout);
+      geocodeTimeout = setTimeout(() => {
+        reverseGeocode(lat, lng);
+      }, 500);
+    }
+
+    async function reverseGeocode(lat, lng) {
+      try {
+        const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.display_name) {
+            currentAddress = data.display_name;
+            currentPincode = data.address?.postcode || currentPincode;
+            document.getElementById('loc-address').innerText = currentAddress;
+          }
+        }
+      } catch (err) {
+        // Fallback display
+        document.getElementById('loc-address').innerText = `Location pin at ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      }
+    }
+
+    // When map moves, update coords from center
+    map.on('move', () => {
+      const center = map.getCenter();
+      updateCoordinatesDisplay(center.lat, center.lng);
+    });
+
+    // When user clicks on map, smoothly center it
+    map.on('click', (e) => {
+      map.panTo(e.latlng);
+    });
+
+    // Detect GPS
+    function detectGps() {
+      if (!navigator.geolocation) {
+        showToast('Geolocation is not supported by your browser');
+        return;
+      }
+      showToast('Finding your exact GPS location...');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          map.setView([lat, lng], 17);
+          updateCoordinatesDisplay(lat, lng);
+          showToast('GPS location pinned!');
+        },
+        (err) => {
+          showToast('Could not access GPS. Please search or pan the map manually.');
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    }
+
+    document.getElementById('btn-gps').addEventListener('click', detectGps);
+
+    // Area / Address Search
+    async function searchLocation() {
+      const query = document.getElementById('search-input').value.trim();
+      if (!query) return;
+      showToast('Searching area...');
+      try {
+        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=in&limit=1`);
+        if (resp.ok) {
+          const results = await resp.json();
+          if (results && results.length > 0) {
+            const first = results[0];
+            const lat = parseFloat(first.lat);
+            const lng = parseFloat(first.lon);
+            map.setView([lat, lng], 16);
+            updateCoordinatesDisplay(lat, lng);
+            currentAddress = first.display_name;
+            document.getElementById('loc-address').innerText = currentAddress;
+            showToast('Found location!');
+          } else {
+            showToast('Area not found. Try entering city or landmark.');
+          }
+        }
+      } catch (err) {
+        showToast('Search failed. Please pan the map directly.');
+      }
+    }
+
+    document.getElementById('btn-search').addEventListener('click', searchLocation);
+    document.getElementById('search-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') searchLocation();
+    });
+
+    // Auto-detect GPS on load if permitted
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          map.setView([pos.coords.latitude, pos.coords.longitude], 17);
+          updateCoordinatesDisplay(pos.coords.latitude, pos.coords.longitude);
+        },
+        () => {
+          updateCoordinatesDisplay(currentLat, currentLng);
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    } else {
+      updateCoordinatesDisplay(currentLat, currentLng);
+    }
+
+    // Confirm button
+    document.getElementById('btn-confirm').addEventListener('click', () => {
+      const googleMapsUrl = `https://www.google.com/maps?q=${currentLat.toFixed(6)},${currentLng.toFixed(6)}`;
+      const payload = {
+        type: 'MAP_LOCATION_PICKED',
+        googleMapsUrl: googleMapsUrl,
+        lat: Number(currentLat.toFixed(6)),
+        lng: Number(currentLng.toFixed(6)),
+        address: currentAddress,
+        pincode: currentPincode
+      };
+
+      // 1. Post to opener window
+      if (window.opener && !window.opener.closed) {
+        try {
+          window.opener.postMessage(payload, '*');
+        } catch (e) {
+          console.warn('postMessage to opener failed', e);
+        }
+      }
+
+      // 2. Save in localStorage for bulletproof cross-window syncing
+      try {
+        localStorage.setItem('maknuts_last_picked_location', JSON.stringify({
+          ...payload,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        // ignore
+      }
+
+      // Close popup window
+      showToast('Location selected! Returning to checkout...');
+      setTimeout(() => {
+        window.close();
+      }, 400);
+    });
+  </script>
+</body>
+</html>

@@ -42,6 +42,7 @@ interface CatalogPageProps {
   onAddProduct: (prod: Omit<Product, 'id'>) => Promise<Product>;
   onUpdateProduct: (prod: Product) => Promise<void>;
   onDeleteProduct: (id: string) => Promise<void>;
+  onUpdateSettings?: (updated: Partial<StoreSettings>) => Promise<void>;
   initialSubTab?: string;
   onSubTabChange?: (tab: string) => void;
 }
@@ -54,6 +55,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
+  onUpdateSettings,
   initialSubTab = 'products',
   onSubTabChange,
 }) => {
@@ -199,12 +201,25 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
     setIsSaving(true);
     try {
+      let savedProduct: Product | undefined;
       if (isAddingNew) {
         const { id, ...data } = editingProduct;
-        await onAddProduct(data);
+        savedProduct = await onAddProduct(data);
       } else {
         await onUpdateProduct(editingProduct);
+        savedProduct = editingProduct;
       }
+
+      if (savedProduct) {
+        setActiveProductId(savedProduct.id);
+        // If marked as featured or default showcase, persist to storeSettings
+        if (editingProduct.isFeatured || isAddingNew || products.length <= 1) {
+          if (onUpdateSettings) {
+            await onUpdateSettings({ defaultProductId: savedProduct.id });
+          }
+        }
+      }
+
       setSaveToast(true);
       setTimeout(() => {
         setSaveToast(false);
@@ -353,7 +368,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
           {/* Product Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredProducts.map((prod) => {
-              const isHomeShowcase = prod.id === activeProduct.id;
+              const isHomeShowcase = prod.id === (storeSettings.defaultProductId || activeProduct.id);
               const hasLowStock = (prod.stockCount !== undefined ? prod.stockCount : 100) < (prod.lowStockThreshold || 10);
 
               return (
@@ -429,14 +444,39 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-3.5 pt-3 border-t border-stone-100 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setActiveProductId(prod.id)}
-                      className="text-xs text-emerald-800 hover:text-emerald-950 hover:underline font-bold cursor-pointer"
-                    >
-                      {isHomeShowcase ? '★ Current Showcase' : 'Set as Home Showcase'}
-                    </button>
+                  <div className="mt-3.5 pt-3 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setActiveProductId(prod.id);
+                          if (onUpdateSettings) {
+                            await onUpdateSettings({ defaultProductId: prod.id });
+                          }
+                          setSaveToast(true);
+                          setTimeout(() => setSaveToast(false), 2000);
+                        }}
+                        className={`text-xs font-bold px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
+                          isHomeShowcase
+                            ? 'bg-emerald-800 text-amber-200 shadow-xs'
+                            : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                        }`}
+                        title="Set this product as the default homepage showcase when customers open your store"
+                      >
+                        {isHomeShowcase ? '★ Current Showcase' : '☆ Set as Home Showcase'}
+                      </button>
+
+                      <a
+                        href={`/?product=${prod.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-stone-500 hover:text-emerald-900 hover:underline flex items-center gap-1 font-semibold"
+                        title="Open this product page directly in storefront"
+                      >
+                        <ExternalLink className="w-3 h-3 text-emerald-700" />
+                        <span className="hidden sm:inline">View Live Page</span>
+                      </a>
+                    </div>
 
                     <div className="flex items-center gap-1.5">
                       <button
@@ -445,7 +485,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
                         className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-emerald-100 text-stone-800 hover:text-emerald-900 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
-                        <span>Edit Full Product</span>
+                        <span>Edit Product</span>
                       </button>
 
                       {products.length > 1 && (
@@ -829,7 +869,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
                     />
                   </div>
 
-                  <div className="flex items-center gap-4 pt-1">
+                  <div className="flex flex-wrap items-center gap-4 pt-1">
                     <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-stone-800">
                       <input
                         type="checkbox"
@@ -848,6 +888,16 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
                         className="w-4 h-4 accent-amber-500 rounded"
                       />
                       <span>Featured Bestseller Badge</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-950 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                      <input
+                        type="checkbox"
+                        checked={editingProduct.isFeatured || false}
+                        onChange={e => setEditingProduct({ ...editingProduct, isFeatured: e.target.checked })}
+                        className="w-4 h-4 accent-emerald-800 rounded"
+                      />
+                      <span>★ Set as Primary Storefront Showcase (Landing Page)</span>
                     </label>
                   </div>
                 </div>

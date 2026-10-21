@@ -81,6 +81,7 @@ interface StoreContextType {
   updateProduct: (product: Product) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   updateSettings: (settings: Partial<StoreSettings>) => Promise<void>;
+  setDefaultProduct: (id: string) => Promise<void>;
   createOrder: (orderData: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'status' | 'paymentStatus'> & { paymentStatus?: PaymentStatus }) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   updatePaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => Promise<void>;
@@ -127,16 +128,81 @@ interface StoreContextType {
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
+// Cache helpers to prevent flash of default content and ensure edited pages show immediately
+const getCachedSettings = (): StoreSettings => {
+  try {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem('maknuts_store_settings');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return { ...DEFAULT_SETTINGS, ...parsed };
+      }
+    }
+  } catch {}
+  return DEFAULT_SETTINGS;
+};
+
+const getCachedProducts = (): Product[] => {
+  try {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem('maknuts_products');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    }
+  } catch {}
+  return [DEFAULT_PRODUCT];
+};
+
+const getInitialActiveProductId = (initSettings: StoreSettings, initProducts: Product[]): string => {
+  try {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlProd = searchParams.get('product') || searchParams.get('p');
+      if (urlProd) return urlProd;
+      const hash = window.location.hash;
+      if (hash.startsWith('#product=')) {
+        const hProd = hash.replace('#product=', '').trim();
+        if (hProd) return hProd;
+      }
+    }
+  } catch {}
+  if (initSettings.defaultProductId) return initSettings.defaultProductId;
+  try {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('maknuts_active_product_id');
+      if (cached) return cached;
+    }
+  } catch {}
+  return initProducts[0]?.id || DEFAULT_PRODUCT.id;
+};
+
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [products, setProducts] = useState<Product[]>([DEFAULT_PRODUCT]);
-  const [activeProductId, setActiveProductId] = useState<string>(DEFAULT_PRODUCT.id);
-  const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
+  const initialSettings = getCachedSettings();
+  const initialProducts = getCachedProducts();
+
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [activeProductId, setActiveProductIdState] = useState<string>(() =>
+    getInitialActiveProductId(initialSettings, initialProducts)
+  );
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(initialSettings);
   const [orders, setOrders] = useState<Order[]>([]);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [adminUser, setAdminUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Wrapper for setActiveProductId to also save to localStorage and keep track
+  const setActiveProductId = (id: string) => {
+    setActiveProductIdState(id);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('maknuts_active_product_id', id);
+      }
+    } catch {}
+  };
 
   // Monitor Firebase Authentication state
   useEffect(() => {
@@ -187,10 +253,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             prods.push(d.data() as Product);
           });
           setProducts(prods);
-          // Keep active product updated if exists
-          if (!prods.some(p => p.id === activeProductId)) {
-            setActiveProductId(prods[0]?.id || DEFAULT_PRODUCT.id);
-          }
+          try {
+            localStorage.setItem('maknuts_products', JSON.stringify(prods));
+          } catch {}
+
+          // Check if active product is valid or URL requests a product
+          setActiveProductIdState(currId => {
+            if (typeof window !== 'undefined') {
+              const searchParams = new URLSearchParams(window.location.search);
+              const urlProd = searchParams.get('product') || searchParams.get('p');
+              if (urlProd && prods.some(p => p.id === urlProd)) return urlProd;
+            }
+            if (prods.some(p => p.id === currId)) return currId;
+            const defId = storeSettings.defaultProductId;
+            if (defId && prods.some(p => p.id === defId)) return defId;
+            return prods[0]?.id || DEFAULT_PRODUCT.id;
+          });
         }
         setIsLoading(false);
       },
@@ -200,7 +278,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
 
     return () => unsubscribe();
-  }, [activeProductId]);
+  }, [storeSettings.defaultProductId]);
 
   // 2. Realtime Firestore Sync for Store Settings
   useEffect(() => {
@@ -219,9 +297,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else {
           const data = snapshot.data() as StoreSettings;
           delete (data as any).adminPassword;
-          setStoreSettings({
+          const merged: StoreSettings = {
             ...DEFAULT_SETTINGS,
             ...data,
+            defaultProductId: data.defaultProductId || DEFAULT_SETTINGS.defaultProductId,
             trustBadges: data.trustBadges || DEFAULT_SETTINGS.trustBadges,
             buttons: { ...DEFAULT_SETTINGS.buttons, ...(data.buttons || {}) },
             benefitsSection: {
@@ -275,7 +354,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             },
             socialLinks: { ...DEFAULT_SETTINGS.socialLinks, ...(data.socialLinks || {}) },
             mediaLibrary: Array.isArray(data.mediaLibrary) ? data.mediaLibrary : DEFAULT_SETTINGS.mediaLibrary,
-          });
+          };
+          setStoreSettings(merged);
+          try {
+            localStorage.setItem('maknuts_store_settings', JSON.stringify(merged));
+          } catch {}
+
+          // If default product is defined, and no manual URL product is set, update active product
+          if (data.defaultProductId) {
+            let hasUrlProd = false;
+            if (typeof window !== 'undefined') {
+              const sp = new URLSearchParams(window.location.search);
+              hasUrlProd = Boolean(sp.get('product') || sp.get('p'));
+            }
+            if (!hasUrlProd) {
+              setActiveProductIdState(data.defaultProductId);
+            }
+          }
         }
       },
       (error) => {
@@ -456,6 +551,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     try {
       const safeProduct = await optimizeProductForFirestore(newProduct);
+      setProducts(prev => {
+        const next = [...prev.filter(p => p.id !== newId), safeProduct];
+        try { localStorage.setItem('maknuts_products', JSON.stringify(next)); } catch {}
+        return next;
+      });
       await setDoc(doc(db, 'products', newId), sanitizeForFirestore(safeProduct));
       return safeProduct;
     } catch (e) {
@@ -467,6 +567,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateProduct = async (updated: Product): Promise<void> => {
     try {
       const safeUpdated = await optimizeProductForFirestore(updated);
+      setProducts(prev => {
+        const next = prev.map(p => p.id === updated.id ? safeUpdated : p);
+        try { localStorage.setItem('maknuts_products', JSON.stringify(next)); } catch {}
+        return next;
+      });
       await setDoc(doc(db, 'products', updated.id), sanitizeForFirestore(safeUpdated));
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `products/${updated.id}`);
@@ -475,11 +580,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Firebase Delete Product
   const deleteProduct = async (id: string): Promise<void> => {
+    setProducts(prev => {
+      const next = prev.filter(p => p.id !== id);
+      try { localStorage.setItem('maknuts_products', JSON.stringify(next)); } catch {}
+      return next;
+    });
     try {
       await deleteDoc(doc(db, 'products', id));
     } catch (e) {
       handleFirestoreError(e, OperationType.DELETE, `products/${id}`);
     }
+  };
+
+  // Set default homepage product (persisted to Firestore & local cache)
+  const setDefaultProduct = async (id: string): Promise<void> => {
+    setActiveProductId(id);
+    try {
+      localStorage.setItem('maknuts_active_product_id', id);
+    } catch {}
+    await updateSettings({ defaultProductId: id });
   };
 
   // Firebase Update Settings
@@ -511,6 +630,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newSettings: StoreSettings = {
       ...storeSettings,
       ...updated,
+      defaultProductId: updated.defaultProductId !== undefined ? updated.defaultProductId : (storeSettings.defaultProductId || DEFAULT_SETTINGS.defaultProductId),
       deliveryCharge: cleanDelivery,
       freeDeliveryThreshold: cleanFreeThreshold,
       freeDeliveryAllOrders: updated.freeDeliveryAllOrders !== undefined
@@ -607,6 +727,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     // Ensure no password is ever saved to Firestore settings
     delete (newSettings as any).adminPassword;
+
+    // Immediately update local state & local storage for instant feedback
+    setStoreSettings(newSettings);
+    try {
+      localStorage.setItem('maknuts_store_settings', JSON.stringify(newSettings));
+    } catch {}
 
     try {
       const safeSettings = await optimizeSettingsForFirestore(newSettings);
@@ -1781,6 +1907,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateProduct,
         deleteProduct,
         updateSettings,
+        setDefaultProduct,
         createOrder,
         updateOrderStatus,
         updatePaymentStatus,

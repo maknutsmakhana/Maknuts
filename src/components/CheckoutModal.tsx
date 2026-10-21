@@ -3,12 +3,14 @@ import { Product, StoreSettings, Order, Coupon } from '../types';
 import { useStore } from '../context/StoreContext';
 import { 
   X, Check, Copy, ShieldCheck, Truck,
-  CreditCard, Banknote, QrCode, AlertCircle, MessageCircle, ExternalLink, Plus, Minus, RefreshCw, Tag, Sparkles, Ticket
+  CreditCard, Banknote, QrCode, AlertCircle, MessageCircle, ExternalLink, Plus, Minus, RefreshCw, Tag, Sparkles, Ticket,
+  MapPin, Navigation
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { generateOrderWhatsAppMessage, createWhatsAppUrl } from '../utils/whatsapp';
 import { calculateOrderPricing, validateAndApplyCoupon } from '../utils/pricing';
 import { DEFAULT_ORDER_DISPLAY_SETTINGS } from '../constants';
+import { LocationPickerModal } from './LocationPickerModal';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -43,6 +45,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [address, setAddress] = useState('');
   const [landmark, setLandmark] = useState('');
   const [pincode, setPincode] = useState('');
+  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const [showMapPreview, setShowMapPreview] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(initialQuantity);
   const [note, setNote] = useState('');
 
@@ -57,8 +65,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // UI state
   const [copiedUpi, setCopiedUpi] = useState(false);
+  const [copiedMapLink, setCopiedMapLink] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
-  const [showQrCode, setShowQrCode] = useState(true);
+  const [showQrCode, setShowQrCode] = useState(false); // Hidden by default as requested
+  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState<string>('');
@@ -75,6 +85,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setSubmissionError('');
       setFormValidationMessage('');
       setCouponFeedback(null);
+      setGoogleMapsUrl('');
+      setCoordinates(null);
+      setLocationError('');
+      setIsLocating(false);
       setIsSubmitting(false);
       isSubmittingRef.current = false;
     }
@@ -189,10 +203,179 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [storeSettings.upiId, upiUrl]);
 
+  // Listen for location selected from popup window or localStorage
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'MAP_LOCATION_PICKED') {
+        const { googleMapsUrl: pickedUrl, lat, lng, address: pickedAddress, pincode: pickedPin } = event.data;
+        if (pickedUrl) {
+          setGoogleMapsUrl(pickedUrl);
+          setShowMapPreview(true);
+        }
+        if (lat && lng) {
+          setCoordinates({ lat, lng });
+        }
+        if (pickedAddress && !address) {
+          setAddress(pickedAddress);
+        }
+        if (pickedPin && !pincode) {
+          setPincode(pickedPin.replace(/\D/g, '').slice(0, 6));
+        }
+        setLocationError('');
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next.googleMapsUrl;
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    const handleFocus = () => {
+      try {
+        const raw = localStorage.getItem('maknuts_last_picked_location');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Date.now() - parsed.timestamp < 120000 && parsed.googleMapsUrl) {
+            setGoogleMapsUrl(parsed.googleMapsUrl);
+            setShowMapPreview(true);
+            if (parsed.lat && parsed.lng) {
+              setCoordinates({ lat: parsed.lat, lng: parsed.lng });
+            }
+            if (parsed.address && !address) {
+              setAddress(parsed.address);
+            }
+            if (parsed.pincode && !pincode) {
+              setPincode(parsed.pincode.replace(/\D/g, '').slice(0, 6));
+            }
+            setLocationError('');
+            setErrors(prev => {
+              const next = { ...prev };
+              delete next.googleMapsUrl;
+              return next;
+            });
+            localStorage.removeItem('maknuts_last_picked_location');
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [address, pincode]);
+
+  const handleOpenMapPicker = () => {
+    setIsLocationPickerOpen(true);
+  };
+
   const handleCopyUpi = () => {
     navigator.clipboard.writeText(storeSettings.upiId);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2500);
+  };
+
+  const handleDetectGpsLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocating(true);
+    setLocationError('');
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setIsLocating(false);
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        const accuracy = Math.round(pos.coords.accuracy || 0);
+        setGpsAccuracy(accuracy);
+        const url = `https://maps.google.com/?q=${lat},${lng}`;
+        setCoordinates({ lat, lng });
+        setGoogleMapsUrl(url);
+        setShowMapPreview(true);
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next.googleMapsUrl;
+          return next;
+        });
+
+        // Quick auto-suggestion for pincode/area if empty
+        if (!pincode) {
+          try {
+            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+              headers: { 'Accept': 'application/json' }
+            });
+            if (resp.ok) {
+              const geoData = await resp.json();
+              if (geoData?.address?.postcode && !pincode) {
+                setPincode(geoData.address.postcode.replace(/\D/g, '').slice(0, 6));
+              }
+              if (!address && geoData?.display_name) {
+                const parts = [
+                  geoData.address?.suburb || geoData.address?.neighbourhood || geoData.address?.road,
+                  geoData.address?.city || geoData.address?.town || geoData.address?.village,
+                  geoData.address?.state
+                ].filter(Boolean);
+                if (parts.length > 0) {
+                  setAddress(parts.join(', '));
+                }
+              }
+            }
+          } catch {
+            // Silently ignore reverse geocode lookup failure
+          }
+        }
+      },
+      (err) => {
+        setIsLocating(false);
+        console.warn('Geolocation error:', err);
+        if (err.code === 1) {
+          setLocationError('Location permission denied in browser. Opening visual map to pick your location...');
+          setIsLocationPickerOpen(true);
+        } else {
+          setLocationError('Could not detect GPS signal. Tap "Select on Map" to pick your address.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  };
+
+  const handleLocationUrlChange = (val: string) => {
+    setGoogleMapsUrl(val);
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.googleMapsUrl;
+      return next;
+    });
+
+    // Check if customer typed or pasted raw coordinates like "25.5941, 85.1376"
+    const rawCoordsMatch = val.trim().match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/);
+    if (rawCoordsMatch) {
+      const lat = parseFloat(rawCoordsMatch[1]);
+      const lng = parseFloat(rawCoordsMatch[3]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setCoordinates({ lat, lng });
+        setGoogleMapsUrl(`https://maps.google.com/?q=${lat},${lng}`);
+        setShowMapPreview(true);
+        return;
+      }
+    }
+
+    // Check if URL has ?q=lat,lng or @lat,lng
+    const queryCoordMatch = val.match(/(?:q=|@)(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (queryCoordMatch) {
+      const lat = parseFloat(queryCoordMatch[1]);
+      const lng = parseFloat(queryCoordMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setCoordinates({ lat, lng });
+        setShowMapPreview(true);
+      }
+    }
   };
 
   const validateForm = (): boolean => {
@@ -224,6 +407,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
     }
 
+    // Google Map location validation (if required by admin)
+    if (ds.checkoutShowGoogleMapLocation !== false && ds.checkoutRequireGoogleMapLocation === true && !googleMapsUrl.trim()) {
+      newErrors.googleMapsUrl = 'Please provide your Google Map location';
+    }
+
     // Optional UTR validation when UPI is selected
     if (paymentMethod === 'upi' && upiRefNumber.trim()) {
       const cleanUtr = upiRefNumber.trim();
@@ -241,6 +429,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (newErrors.phone) missingFields.push('Mobile');
       if (newErrors.address) missingFields.push('Address');
       if (newErrors.pincode) missingFields.push('PIN Code');
+      if (newErrors.googleMapsUrl) missingFields.push('Map Location');
       if (newErrors.upiRefNumber) missingFields.push('UTR format');
       
       setFormValidationMessage(`Please review: ${missingFields.join(', ')}`);
@@ -282,6 +471,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         address: effectiveAddress,
         landmark: landmark.trim() ? landmark.trim() : undefined,
         pincode: pincode.trim(),
+        googleMapsUrl: googleMapsUrl.trim() ? googleMapsUrl.trim() : undefined,
+        coordinates: coordinates || undefined,
         productId: product.id,
         productName: product.name,
         productWeight: product.weight,
@@ -596,9 +787,175 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               )}
 
+              {/* Delivery Location: Only 1. Use my current location and 2. Select on Map */}
+              {ds.checkoutShowGoogleMapLocation !== false && (
+                <div className="sm:col-span-2 p-4 bg-gradient-to-br from-emerald-50/90 via-white to-amber-50/40 rounded-2xl border border-emerald-200/90 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <span>Delivery Location {ds.checkoutRequireGoogleMapLocation ? '*' : '(For Courier Dispatch)'}</span>
+                    </label>
+                    {coordinates && (
+                      <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-700" />
+                        <span>Location Linked</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-stone-600 leading-relaxed">
+                    Set your delivery location using GPS or select your exact doorstep pin on the Google Map:
+                  </p>
+
+                  {/* Two Primary Action Buttons */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* 1. Use my current location */}
+                    <button
+                      type="button"
+                      onClick={handleDetectGpsLocation}
+                      disabled={isLocating || isSubmitting}
+                      className="px-4 py-3 bg-white hover:bg-emerald-50/80 active:scale-[0.99] border-2 border-emerald-600/30 hover:border-emerald-600 text-emerald-950 rounded-xl text-xs font-bold flex items-center justify-center gap-2.5 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+                      title="Auto-detect current GPS location"
+                    >
+                      {isLocating ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-emerald-800 border-t-transparent rounded-full animate-spin" />
+                          <span>Detecting GPS location...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                            <Navigation className="w-4 h-4 text-emerald-800" />
+                          </div>
+                          <div className="text-left">
+                            <div className="text-xs font-bold text-emerald-950">1. Use my current location</div>
+                            <div className="text-[10px] font-normal text-stone-500">Auto-detect live GPS pin</div>
+                          </div>
+                        </>
+                      )}
+                    </button>
+
+                    {/* 2. Select on map */}
+                    <button
+                      type="button"
+                      onClick={handleOpenMapPicker}
+                      disabled={isSubmitting}
+                      className="px-4 py-3 bg-emerald-800 hover:bg-emerald-900 active:scale-[0.99] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2.5 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+                      title="Open Google Map popup to pick exact doorstep pin"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-emerald-700/80 flex items-center justify-center shrink-0">
+                        <MapPin className="w-4 h-4 text-amber-300" />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-xs font-bold text-white">2. Select on map</div>
+                        <div className="text-[10px] font-normal text-emerald-200">Open map popup & pick doorstep</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Feedback / Error */}
+                  {locationError && (
+                    <div className="p-2.5 bg-amber-50 text-amber-950 rounded-xl border border-amber-200 text-[11px] flex items-center justify-between gap-2">
+                      <p className="flex items-center gap-1.5 font-medium text-amber-900 min-w-0">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-700" />
+                        <span className="truncate">{locationError}</span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleOpenMapPicker}
+                        className="px-2.5 py-1 bg-emerald-800 text-white rounded-lg text-[10px] font-bold shrink-0 hover:bg-emerald-900 cursor-pointer"
+                      >
+                        Select on Map
+                      </button>
+                    </div>
+                  )}
+
+                  {errors.googleMapsUrl && (
+                    <p className="text-[11px] text-rose-600 flex items-center gap-1 font-medium bg-rose-50 p-2 rounded-lg border border-rose-200">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{errors.googleMapsUrl}</span>
+                    </p>
+                  )}
+
+                  {/* Clean In-App Delivery Doorstep Confirmation Card */}
+                  {(coordinates || googleMapsUrl) && (
+                    <div className="p-3 bg-emerald-100/90 border border-emerald-300/80 rounded-xl text-xs text-emerald-950 space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-6 h-6 rounded-full bg-emerald-800 text-amber-300 flex items-center justify-center shrink-0">
+                            <Check className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-bold text-xs text-emerald-950 block truncate">
+                              Location Selected: {coordinates ? `${coordinates.lat}, ${coordinates.lng}` : 'Google Maps Pin'}
+                            </span>
+                            {gpsAccuracy && (
+                              <span className="text-[10px] text-emerald-800 font-normal">
+                                Live GPS Accuracy: ±{gpsAccuracy}m
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={handleOpenMapPicker}
+                            className="px-2.5 py-1 bg-white hover:bg-stone-50 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                          >
+                            <MapPin className="w-3 h-3 text-emerald-700" />
+                            <span>Change on Map</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetUrl = googleMapsUrl || `https://www.google.com/maps?q=${coordinates?.lat},${coordinates?.lng}`;
+                              navigator.clipboard.writeText(targetUrl);
+                              setCopiedMapLink(true);
+                              setTimeout(() => setCopiedMapLink(false), 2500);
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-stone-50 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                          >
+                            {copiedMapLink ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-600" />
+                                <span>Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3 text-stone-600" />
+                                <span>Copy Link</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGoogleMapsUrl('');
+                              setCoordinates(null);
+                              setGpsAccuracy(null);
+                              setShowMapPreview(false);
+                            }}
+                            className="text-[10px] text-stone-500 hover:text-stone-800 underline font-medium cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      {address && (
+                        <p className="text-[11px] text-emerald-900/90 bg-white/70 p-2 rounded-lg border border-emerald-200/60 line-clamp-2">
+                          <strong>Doorstep address:</strong> {address}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Optional Delivery Note */}
               {ds.checkoutShowCustomerNote !== false && (
-                <div className={ds.checkoutShowLandmark === false || ds.checkoutShowPincode === false ? 'sm:col-span-1' : 'sm:col-span-2'}>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-stone-700 mb-1">
                     Optional Delivery Note
                   </label>
@@ -928,15 +1285,46 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </button>
                 </div>
 
+                {/* QR Code toggle button (hidden by default) */}
+                {ds.checkoutShowUpiQr !== false && !showQrCode && (
+                  <button
+                    type="button"
+                    onClick={() => setShowQrCode(true)}
+                    className="w-full py-2.5 px-3 bg-white hover:bg-emerald-50/70 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-900 flex items-center justify-center gap-2 shadow-2xs transition-all cursor-pointer"
+                  >
+                    <QrCode className="w-4 h-4 text-emerald-700" />
+                    <span>Show UPI QR Code to Scan &amp; Pay ▼</span>
+                  </button>
+                )}
+
                 {/* Working UPI QR Code with exact amount and details */}
-                {ds.checkoutShowUpiQr !== false && showQrCode && qrCodeDataUrl && (
-                  <div className="bg-white p-4 rounded-xl border border-stone-200 text-center flex flex-col items-center">
-                    <img
-                      src={qrCodeDataUrl}
-                      alt="UPI QR Code"
-                      referrerPolicy="no-referrer"
-                      className="w-44 h-44 rounded-lg shadow-xs"
-                    />
+                {ds.checkoutShowUpiQr !== false && showQrCode && (
+                  <div className="bg-white p-4 rounded-xl border border-emerald-200 text-center flex flex-col items-center animate-in fade-in duration-150">
+                    <div className="w-full flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                        <QrCode className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>UPI Payment QR Code</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowQrCode(false)}
+                        className="text-[11px] font-semibold text-stone-500 hover:text-stone-800 underline cursor-pointer"
+                      >
+                        Hide QR Code ▲
+                      </button>
+                    </div>
+                    {qrCodeDataUrl ? (
+                      <img
+                        src={qrCodeDataUrl}
+                        alt="UPI QR Code"
+                        referrerPolicy="no-referrer"
+                        className="w-44 h-44 rounded-lg shadow-xs"
+                      />
+                    ) : (
+                      <div className="w-44 h-44 flex items-center justify-center bg-stone-50 rounded-lg border border-dashed border-stone-300">
+                        <span className="text-xs text-stone-400">Loading QR...</span>
+                      </div>
+                    )}
                     <p className="text-xs font-bold text-emerald-950 mt-2">
                       Scan to Pay ₹{totalAmount}
                     </p>
@@ -946,16 +1334,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                 )}
 
-                {/* Requirement 2: Pay with UPI App button */}
-                <div>
-                  <a
-                    href={upiUrl}
-                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all text-center"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Pay with UPI App (GPay, PhonePe, Paytm, BHIM)</span>
-                  </a>
-                </div>
+                {/* Pay with UPI App button (Admin Controlled) */}
+                {ds.checkoutShowPayWithUpiApp !== false && (
+                  <div>
+                    <a
+                      href={upiUrl}
+                      className="w-full py-2.5 px-4 rounded-xl bg-emerald-800 hover:bg-emerald-900 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all text-center"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Pay with UPI App (GPay, PhonePe, Paytm, BHIM)</span>
+                    </a>
+                  </div>
+                )}
 
                 {/* Requirement 4: Optional UPI Transaction ID / UTR Number */}
                 <div>
@@ -1040,6 +1430,31 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Interactive Location Picker Modal (in-app / fallback) */}
+      <LocationPickerModal
+        isOpen={isLocationPickerOpen}
+        onClose={() => setIsLocationPickerOpen(false)}
+        initialLat={coordinates?.lat || 25.5941}
+        initialLng={coordinates?.lng || 85.1376}
+        onSelectLocation={(loc) => {
+          setGoogleMapsUrl(loc.googleMapsUrl);
+          setCoordinates({ lat: loc.lat, lng: loc.lng });
+          setShowMapPreview(true);
+          if (loc.address && !address) {
+            setAddress(loc.address);
+          }
+          if (loc.pincode && !pincode) {
+            setPincode(loc.pincode);
+          }
+          setLocationError('');
+          setErrors(prev => {
+            const next = { ...prev };
+            delete next.googleMapsUrl;
+            return next;
+          });
+        }}
+      />
     </div>
   );
 };

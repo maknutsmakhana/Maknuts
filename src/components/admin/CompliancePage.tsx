@@ -78,6 +78,33 @@ export const CompliancePage: React.FC<CompliancePageProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
 
+  // Sync state when settings update externally
+  React.useEffect(() => {
+    if (!isSaving && settings) {
+      if (settings.foodCompliance?.marketerName) setBusinessName(settings.foodCompliance.marketerName);
+      if (settings.foodCompliance?.fssaiNumber !== undefined) setFssaiNumber(settings.foodCompliance.fssaiNumber);
+      if (settings.address) setBusinessAddress(settings.address);
+      if (settings.foodCompliance?.customerCarePhone || settings.supportPhone) {
+        setCustomerCarePhone(settings.foodCompliance?.customerCarePhone || settings.supportPhone);
+      }
+      if (settings.foodCompliance?.customerCareEmail || settings.supportEmail) {
+        setCustomerCareEmail(settings.foodCompliance?.customerCareEmail || settings.supportEmail);
+      }
+      if (settings.foodCompliance?.customerCareAddress) {
+        setCustomerCareAddress(settings.foodCompliance.customerCareAddress);
+      }
+      if (settings.policies) {
+        setPolicies({
+          terms: settings.policies.terms || '',
+          privacy: settings.policies.privacy || '',
+          returns: settings.policies.returns || '',
+          shipping: settings.policies.shipping || '',
+          cancellation: settings.policies.cancellation || '',
+        });
+      }
+    }
+  }, [settings, isSaving]);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {

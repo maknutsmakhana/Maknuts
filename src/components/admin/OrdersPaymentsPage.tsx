@@ -29,7 +29,9 @@ import {
   AlertCircle,
   Eye,
   IndianRupee,
-  Sparkles
+  Sparkles,
+  MapPin,
+  Navigation
 } from 'lucide-react';
 import { downloadOrderInvoicePdf, downloadOrdersReportPdf } from '../../utils/pdfGenerator';
 import { createWhatsAppUrl } from '../../utils/whatsapp';
@@ -429,6 +431,21 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
                                 <MessageCircle className="w-3.5 h-3.5" />
                               </button>
                             </div>
+                            {(order.googleMapsUrl || order.coordinates) && (
+                              <div className="mt-1">
+                                <a
+                                  href={order.googleMapsUrl || `https://maps.google.com/?q=${order.coordinates?.lat},${order.coordinates?.lng}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded text-[10px] font-semibold"
+                                  title="Open accurate delivery location in Google Maps"
+                                >
+                                  <MapPin className="w-2.5 h-2.5 text-emerald-700 shrink-0" />
+                                  <span>Google Map</span>
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                                </a>
+                              </div>
+                            )}
                           </td>
 
                           <td className="py-3 px-3.5">
@@ -610,6 +627,64 @@ export const OrdersPaymentsPage: React.FC<OrdersPaymentsPageProps> = ({
                 <span className="text-stone-500 block">Delivery Address:</span>
                 <span className="font-medium text-stone-800">{selectedOrder.address}, PIN: {selectedOrder.pincode}</span>
               </div>
+              {(selectedOrder.googleMapsUrl || selectedOrder.coordinates) && (
+                <div className="pt-2 mt-1 border-t border-stone-200/80 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-emerald-950 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Accurate Google Maps Delivery Location</span>
+                    </span>
+                    {selectedOrder.coordinates && (
+                      <span className="text-[10px] font-mono font-medium text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded border border-emerald-200">
+                        GPS: {selectedOrder.coordinates.lat}, {selectedOrder.coordinates.lng}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <a
+                      href={selectedOrder.googleMapsUrl || `https://maps.google.com/?q=${selectedOrder.coordinates?.lat},${selectedOrder.coordinates?.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold shadow-2xs transition-transform active:scale-95"
+                    >
+                      <MapPin className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Open in Google Maps</span>
+                      <ExternalLink className="w-3 h-3 opacity-80" />
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const link = selectedOrder.googleMapsUrl || `https://maps.google.com/?q=${selectedOrder.coordinates?.lat},${selectedOrder.coordinates?.lng}`;
+                        navigator.clipboard.writeText(link);
+                        alert('Google Maps delivery link copied to clipboard!');
+                      }}
+                      className="px-2.5 py-1.5 bg-white hover:bg-stone-100 text-stone-700 border border-stone-300 rounded-lg text-xs font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Copy Maps Link</span>
+                    </button>
+                  </div>
+
+                  {/* Embedded Google Map Preview */}
+                  {selectedOrder.coordinates && (
+                    <div className="mt-2 rounded-xl overflow-hidden border border-emerald-200 aspect-video max-h-44 w-full bg-stone-100 shadow-2xs">
+                      <iframe
+                        title="Delivery Location Pin"
+                        width="100%"
+                        height="100%"
+                        frameBorder="0"
+                        scrolling="no"
+                        marginHeight={0}
+                        marginWidth={0}
+                        src={`https://maps.google.com/maps?q=${selectedOrder.coordinates.lat},${selectedOrder.coordinates.lng}&z=16&output=embed`}
+                        className="w-full h-full"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
               {selectedOrder.note && (
                 <div>
                   <span className="text-stone-500 block">Customer Note:</span>

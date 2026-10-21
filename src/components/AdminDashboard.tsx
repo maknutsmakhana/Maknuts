@@ -530,6 +530,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose 
                   onAddProduct={addProduct}
                   onUpdateProduct={updateProduct}
                   onDeleteProduct={deleteProduct}
+                  onUpdateSettings={updateSettings}
                   initialSubTab={activeSubTab}
                   onSubTabChange={(sub: string) => setActiveSubTab(sub)}
                 />
